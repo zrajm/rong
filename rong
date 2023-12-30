@@ -1,0 +1,172 @@
+#!/usr/bin/env perl
+# Copyright (C) 2023 zrajm <rong@zrajm.org>
+# License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
+
+# FIXME: Daemon should accept standard signals for reload/restart (SIGHUP,
+#     SIGINT?)
+
+# https://perl.com/pub/2012/04/perlunicook-standard-preamble.html
+use utf8;      # so literals and identifiers can be in UTF-8
+use v5.12;     # or later to get "unicode_strings" feature
+use strict;    # quote strings, declare variables
+use warnings;  # on by default
+use warnings  qw(FATAL utf8);    # fatalize encoding glitches
+use open      qw(:std :utf8);    # undeclared streams in UTF-8
+use charnames qw(:full :short);  # unneeded in v5.16
+
+use Socket;
+
+###############################################################################
+# Functions
+
+# sub read_file {
+#     my ($file) = @_;
+#     open(my $in, '<', $file) or die "Cannot open file '$file' for reading\n";
+#     return wantarray ? <$in> : join('', <$in>);
+# }
+
+# sub write_file {
+#     my ($file, $data, $fh) = @_;
+#     open($fh, '>', $file) or die "Cannot open file '$file' for writing: $!\n";
+#     print $fh $data;
+#     close($fh) or die "Cannot close file '$file' after writing: $!\n";
+# }
+
+# Usage: create_tempdir()
+#
+# Creates a run directory for the Rong server and clients. The directory is
+# called '<TEMPDIR>/<PROGRAMNAME>-<USERID>' (usually '/tmp/rong-1000' but all
+# parts can change depending on your $TEMPDIR variable, the name of the script
+# and your user's numerical user id). The directory name is the same as Tmux.
+sub create_tempdir {
+    my $dir = sprintf '%s/%s-%s',
+        ($ENV{TMPDIR} // '/tmp'),              # tempdir
+        (split('/', $0))[-1],                  # program's basename
+        $<;                                    # real user ID (number)
+    # FIXME: If dir already exists, make sure it's chmod:ed '0700'.
+    mkdir($dir, 0700) or die "Cannot create tempdir '$dir': $!\n"
+        unless -d $dir;
+    return $dir;
+}
+
+# Start server.
+sub start_server {
+    my ($socket_file) = @_;
+
+    # Create server socket. (Is done BEFORE the fork to make sure that the
+    # socket is available upon return. Socket is however closed again in the
+    # client just after fork.)
+    socket(my $fh, PF_UNIX, SOCK_STREAM, 0)
+        or die "Cannot create socket for '$socket_file': $!";
+    unlink $socket_file
+        or die "Cannot delete previous socket file '$socket_file': $!";
+    bind($fh, sockaddr_un($socket_file))
+        or die "Cannot bind to socket to file '$socket_file': $!";
+    listen($fh, SOMAXCONN)
+        or die "Cannot listen to socket '$socket_file': $!";
+
+    # Start daemon process (in child process).
+    # (This process never returns.)
+    defined(my $server_pid = fork) or die "Cannot fork server: $!\n";
+    if ($server_pid == 0) {                    # daemon (child process)
+        server_main($fh);
+        exit 0;
+    }
+
+    # Close file handle for client.
+    close $fh;
+    return;
+}
+
+sub connect_to_server {
+    my ($socket_file) = @_;
+    socket(my $fh, PF_UNIX, SOCK_STREAM, 0)
+        or die "Cannot create socket for '$socket_file': $!";
+    connect($fh, sockaddr_un($socket_file))
+        or die "Cannot connect socket to file '$socket_file': $!\n";
+    return $fh;
+}
+
+# FIXME: close all standard streams, send messages back to client
+sub server_main {
+    my ($fh) = @_;
+        #use POSIX 'setsid';
+        #chdir '/' or die "Cannot change dir to '/': $!";
+        #setsid    or die "Cannot set session ID: $!";
+        $0 .= ' --daemon';                     #   set daemon `ps` status
+        $| = 1;
+
+        #close STDOUT; close STDIN; close STDERR;   # FIXME: talk only over socket
+
+        # FIXME: Keep track of open connections, die when last has exited(?)
+        while (accept(my $client, $fh)) {
+            $client->autoflush(1);
+            print "----------------------------------------\n";
+            while(<$client>) {
+                chomp();
+                print "Server: >$_<\n";
+            }
+        }
+        print "Server: Stopped listening\n";
+
+        # From 'perlipc'
+        # use IO::Socket;
+        # while (my $client = $fh->accept()) {
+        #     $client->autoflush(1);
+        #     #print $client "Welcome to $0; type help for command list.\n";
+        #     #my $hostinfo = gethostbyaddr($client->peeraddr);
+        #     #printf "[Connect from %s]\n",
+        #     #    $hostinfo ? $hostinfo->name : $client->peerhost;
+        #     #print $client "Command? ";
+        #     while (<$client>) {
+        #         print ">$_<";
+        #         #next unless /\S/;     # blank line
+        #         #if    (/quit|exit/i)  { last                                      }
+        #         #elsif (/date|time/i)  { printf $client "%s\n", scalar localtime() }
+        #         #elsif (/who/i )       { print  $client `who 2>&1`                 }
+        #         #elsif (/cookie/i )    { print  $client `/usr/games/fortune 2>&1`  }
+        #         #elsif (/motd/i )      { print  $client `cat /etc/motd 2>&1`       }
+        #         #else {
+        #         #    print $client "Commands: quit date who cookie motd\n";
+        #         #}
+        #     #} continue {
+        #         #print $client "Command? ";
+        #     }
+        #     close $client;
+        # }
+}
+
+###############################################################################
+# Main
+
+my $tempdir = create_tempdir();
+my $socket = "$tempdir/default";
+
+# FIXME: Invoking Rong multiple times in same terminal works, but not in
+# different terminals. Why? -- Because standard streams of the server is
+# connected to the terminal of first Rong process, output will only occur
+# there, and any subsequent invocations of Rong only produces output in this
+# first terminal.
+#
+# FIXME: Server should respond by sending messages to client.
+
+# Start daemon (if not already running).
+if (not eval { connect_to_server($socket) }) {
+    print "Starting server process\n";
+    start_server($socket);
+} else {
+    print "Server already running\n";
+}
+
+{
+    my $server = connect_to_server($socket);
+    print $server "HELLOES\n";
+    # FIXME: Read response from server
+}
+
+{
+    my $server = connect_to_server($socket);
+    print $server "HELLOES2\n";
+}
+
+#[eof]
