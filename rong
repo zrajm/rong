@@ -13,6 +13,7 @@ use charnames qw(:full :short);  # unneeded in v5.16
 
 use IO::Socket;
 use IO::Select;
+use POSIX;
 
 ###############################################################################
 # Functions
@@ -46,27 +47,39 @@ sub create_tempdir {
     return $dir;
 }
 
-# Start server.
 sub start_server {
     my ($socket_path) = @_;
 
-    # Socket to listen for new clients. Done BEFORE fork (and inherited by
-    # server child) to make sure the listener exists before client process
-    # tries to connect.
-    my $fh = listening_socket($socket_path)
-        or die "Cannot start server: $!";
+    # Create socket for listening to new clients (it's inherited by child
+    # processes). This is done BEFORE forking avoid race where child tries to
+    # connect and listening socket isn't yet there.
+    my $socket_fh = listening_socket($socket_path)
+        or die "Cannot create server's listening socket: $!";
 
-    # Start server child (never returns).
-    defined(my $server_pid = fork)
-        or die "Cannot fork server: $!\n";
-    if ($server_pid == 0) {                    # server child process
-        server_main($fh);
-        exit 0;
+    # Start intermediate process (session leader in new session).
+    defined(my $inter_pid = fork) or die "Cannot fork intermediate: $!\n";
+    if ($inter_pid) {                          # in client:
+        close $socket_fh;
+        wait;                                  #   reap intermediate process
+        return;
+    }
+    POSIX::setsid or die "Cannot make process session leader: $!";
+
+    # Start server process.
+    defined(my $server_pid = fork) or die "Cannot fork server: $!\n";
+    if ($server_pid) {                         # in intermediate
+        exit;
     }
 
-    # Close file handle for client parent.
-    close $fh;
-    return;
+    # I am now the server.
+    umask(0) or die "Cannot change umask to '0': $!\n";
+    chdir('/') or die "Cannot change directory to '/': $!\n";
+    close STDIN;
+    close STDOUT;
+    close STDERR;
+    $0 .= ' --daemon';                         # server process name
+    server_main($socket_fh);
+    exit 0;
 }
 
 # Used by client to connect to server.
@@ -100,12 +113,6 @@ sub listening_socket {
 
 sub server_main {
     my ($server) = @_;
-    #use POSIX 'setsid';
-    #chdir '/' or die "Cannot change dir to '/': $!";
-    #setsid    or die "Cannot set session ID: $!";
-    $0 .= ' --daemon';                     #   set daemon `ps` status
-
-    #close STDOUT; close STDIN; close STDERR;
 
     # Wait until there's input on any incoming connection.
     my $inputs = IO::Select->new($server);
@@ -124,8 +131,9 @@ sub server_main {
                 $fh->close;
                 next;
             };
+            chomp $line;
             print "(from client): $line";      # received input
-            print $fh "received\n";
+            print $fh "received '$line'\n";
         }
     }
 }
@@ -136,7 +144,7 @@ sub server_main {
 my $tempdir = create_tempdir();
 my $socket = "$tempdir/default";
 
-# Try to connect to server.
+# Connect to server.
 my $server = connection_socket($socket);
 if (not $server) {                             # failed to connect
     print "Starting server process\n";

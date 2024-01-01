@@ -1,15 +1,83 @@
 -*- org -*-
 
-* [1/9] Server
+* [0/6] Protocol
+** TODO Selection commands
+** TODO Cursor move commands
+** TODO Text insertion
+** TODO Text deletion
+** TODO Server pushes (client should be able to subscribe to events)
+   This needs to be specified on a file level. Also, a client that isn't
+   displaying a certain file should be able to unsubscribe, then resubscribe
+   and ask for updates when a user starts editing that file again.
+** TODO What format?
+   When one just wants to push a large amount of text, should there be a binary
+   mode? (Without escaping and stuff.)
+* [2/11] Server
 ** DONE Listen to multiple incoming connections (without threading)
    CLOSED: [2023-12-31 Sun 15:49]
    This is done using IO::Select, and the code was adapted from final example
    code on the IO::Select manpage.
+** [6/6] Daemonize server completely
+   From: https://theworld.com/~swmcd/steven/tech/daemon.html
+   (Though I added wait() to reap the intermediate process.)
+
+        use POSIX 'setsid';
+        sub daemonize {
+            fork and do { wait; return };
+            POSIX::setsid();
+            fork and exit;
+            umask 0;
+            chdir '/';
+            close STDIN;
+            close STDOUT;
+            close STDERR;
+        }
+ 
+*** DONE 1. Fork intermediate process
+    CLOSED: [2024-01-01 Mon 09:13]
+    `fork` -- The first fork allows the child to run the daemon while the
+    parent continues execution, or exits. In addition, it ensures that the
+    child is not a process group leader, so that the following `setsid()` call
+    will succeed.
+
+    I also added a `wait` call in the invoking client process, so as to reap
+    the intermediate process and never leave a zombie process in the process
+    table.
+*** DONE 2. Create new process session
+    CLOSED: [2024-01-01 Mon 09:13]
+    `setsid` -- This is how we lose our controlling terminal. `setsid` makes
+    our process the session leader of a new session, and when a new session is
+    created, the session leader has no controlling terminal.
+*** DONE 3. Fork server process
+    CLOSED: [2024-01-01 Mon 09:13]
+    `fork` -- The leader of a new session has no controlling terminal, but
+    it could acquire one, for example, by opening `/dev/tty` or the like. To
+    ensure that this doesn't happen, we fork again.
+
+    After the second fork, the child is not the session leader (the parent is
+    the session leader) and only a session leader can acquire a controlling
+    terminal. Of course, the child could become a session leader by executing
+    `setsid` again, but presumably anyone who does that knows what they are
+    doing.
+*** DONE 4. Reset umask
+    CLOSED: [2024-01-01 Mon 09:13]
+    `umask 0` -- `umask` is inherited across `fork` and `exec`, and we don't
+    want our daemon to be limited by whatever `umask` it happens to inherit
+    from its parent.
+*** DONE 5. Change dir to '/'
+    CLOSED: [2024-01-01 Mon 09:13]
+    `chdir '/'` -- The current working directory is inherited across `fork` and
+    `exec`. If we leave the daemon running in some random directory, then the
+    file system that contains that directory can never be `umounted`, and
+    someone might want to.
+*** DONE 6. Close standard streams
+    CLOSED: [2024-01-01 Mon 09:13]
+    `close` -- Even though the daemon has no controlling terminal, it may still
+    have open file descriptors on a terminal, and these can cause trouble. For
+    reliable operation, close the system file descriptors.
 ** TODO Use Perl -T (taint flag) for the server
    (Manpage perlipc says this is a good idea.)
-** TODO Change dir to '/'
-** TODO Setsid
-** TODO Close all standard streams, only talk on socket
+** TODO Client authentication
 ** TODO Keep track of client-specific data
    E.g. login info, maybe more later.
 ** TODO Keep track of open connections, die when last has exited(?)
@@ -18,6 +86,9 @@
    Function: create_tempdir() -- Easiest is maybe to just 'chmod 0700' the
    directory if it exists on startup?
 ** TODO Accept standard signals for reload/restart (SIGHUP, SIGINT etc.)
+   Resist SIGTERM! This is so that `pkill rong` kills client processes but not
+   the server.
+
    From: https://docstore.mik.ua/orelly/perl/cookbook/ch16_01.htm
 
    SIGINT: is normally triggered by Ctrl-C. This requests that a process
@@ -50,7 +121,13 @@
      systems programming. The system sends your process a SIGCHLD when one of
      its child processes stops running - or, more likely, when that child exits.
      See Recipe 16.19 for more on SIGCHLD.
-* [1/1] Client
+** TODO Logging?
+   Store a log as a buffer? Log to a file? Write status stuff into
+   notifications? Have a client log mode, so that all error messages are sent
+   to all log-receiving clients?
+* [1/2] Client
+** TODO Should shutdown() be used when closing socket?
+   https://docstore.mik.ua/orelly/perl/cookbook/ch17_10.htm
 ** DONE Read from both STDIN and server at same time
    CLOSED: [2023-12-31 Sun 15:49]
    This is done using IO::Select.
