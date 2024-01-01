@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Copyright (C) 2023 zrajm <rong@zrajm.org>
+# Copyright (C) 2023-2024 zrajm <rong@zrajm.org>
 # License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
 
 # https://perl.com/pub/2012/04/perlunicook-standard-preamble.html
@@ -15,8 +15,35 @@ use IO::Socket;
 use IO::Select;
 use POSIX;
 
+our $AUTHOR='zrajm <rong@zrajm.org>';
+our $VERSION='0.0.4';                          # https://semver.org/
+our $VERSION_DATE='1 January 2024';
+our $CREATED_DATE='28 December 2023'; # don't change!
+our $USAGE = <<'USAGE_END';
+Usage: rong [OPTION]...
+A daemonic headless editor.
+
+Options:
+  -h, --help             Display this help and exit
+  -V, --version          Output version information and exit
+USAGE_END
+
 ###############################################################################
 # Functions
+
+sub help { print $USAGE; exit 0; }
+sub version {
+    (my $file     = __FILE__     ) =~ s#^.*/##;
+    (my $years    = $CREATED_DATE) =~ s#^.* ##;
+    (my $end_year = $VERSION_DATE) =~ s#^.* ##;
+    if ($years ne $end_year) { $years .= "-$end_year" }
+    print(
+        "$file (zrajm utils) $VERSION ($VERSION_DATE)\n",
+        "Copyright (C) $years $AUTHOR\n",
+        "License: GNU GPLv2 <https://gnu.org/licenses/gpl-2.0.txt>.\n",
+        "This is free software: You are free to change and redistribute it.\n");
+    exit 0;
+}
 
 # sub read_file {
 #     my ($file) = @_;
@@ -147,6 +174,24 @@ sub server_main {
 my $tempdir = create_tempdir();
 my $socket = "$tempdir/default";
 my $logfile = "$tempdir/server.log";
+
+$SIG{__DIE__} = sub {
+    my ($name) = $0 =~ m#([^/]*$)#;
+    # When not called from function, add extra help.
+    die("$name: @_", defined(caller(1))
+        ? '' : "Try '$name --help' for more information.\n");
+};
+
+my @file;
+while (@ARGV) {
+    local $_ = shift(@ARGV);
+    /^--$/ and do { push(@file, @ARGV); last };
+    /^(-h|--help)$/ and help();
+    /^(-V|--version)$/ and version();
+    /^-./ and die "Unrecognized option '$_'\n";
+    push(@file, $_);
+}
+die "Too many arguments\n" if @file;
 
 # Connect to server.
 my $server = connection_socket($socket);
