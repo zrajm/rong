@@ -18,14 +18,22 @@ getver() { grep -Po '(?<=(['\''"]))[0-9.]+(?=\1)'; }
 
 # If '$FILE' has changed, check that its $VERSION is different.
 for FILE in rong; do
-    if ! git diff --cached --quiet "$FILE"; then
-        NEWVER="$(git grep --cached -h '\$VERSION\s*='       "$FILE" | getver)"
-        OLDVER="$(git grep          -h '\$VERSION\s*=' "$PREV:$FILE" | getver)" \
-            || continue  # file doesn't exist in HEAD (i.e. it's new)
-        if [ -z "$OLDVER" -o -z "$NEWVER" -o "$OLDVER" = "$NEWVER" ]; then
-            echo "${0##*/}: \$VERSION needs update in file '$FILE'"
-            exit 1
-        fi
+    git diff --cached --quiet "$FILE" && continue
+
+    # Check version number.
+    NEWVER="$(git grep --cached -h '\$VERSION\s*='       "$FILE" | getver)"
+    OLDVER="$(git grep          -h '\$VERSION\s*=' "$PREV:$FILE" | getver)" \
+        || continue  # file doesn't exist in HEAD (i.e. it's new)
+    if [ -z "$OLDVER" -o -z "$NEWVER" -o "$OLDVER" = "$NEWVER" ]; then
+        echo "${0##*/}: \$VERSION needs update in file '$FILE'"
+        exit 1
+    fi
+
+    # Check version date.
+    TODAY="$(date +'%-d %B %Y')"
+    if ! git grep --cached -q "\\\$VERSION_DATE\s*=\s*\(['\"]\)$TODAY\1" "$FILE"; then
+        echo "${0##*/}: Not today's date in \$VERSION_DATE in file '$FILE'"
+        exit 1
     fi
 done
 
