@@ -12,7 +12,7 @@
 ** TODO What format?
    When one just wants to push a large amount of text, should there be a binary
    mode? (Without escaping and stuff.)
-* [2/8] Server
+* [3/9] Server
 ** DONE Listen to multiple incoming connections (without threading)
    CLOSED: [2023-12-31 Sun 15:49]
    This is done using IO::Select, and the code was adapted from final example
@@ -80,6 +80,8 @@
    Store a log as a buffer? Log to a file? Write status stuff into
    notifications? Have a client log mode, so that all error messages are sent
    to all log-receiving clients?
+** DONE Git commit hook to validate $VERSION before commit
+   CLOSED: [2024-01-01 Mon 15:55]
 ** [0/3] Simple subcommands
 *** TODO `rong FILE`
 *** TODO `rong cat`
