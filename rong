@@ -82,13 +82,13 @@ sub start_server {
     # Create socket for listening to new clients (it's inherited by child
     # processes). This is done BEFORE forking avoid race where child tries to
     # connect and listening socket isn't yet there.
-    my $socket_fh = listening_socket($socket_path)
+    my $listenfh = listening_socket($socket_path)
         or die "Cannot create server's listening socket: $!";
 
     # Start intermediate process (session leader in new session).
     defined(my $inter_pid = fork) or die "Cannot fork intermediate: $!\n";
     if ($inter_pid) {                          # in client:
-        close $socket_fh;
+        close $listenfh;                       #   close listening socket
         wait;                                  #   reap intermediate process
         return;
     }
@@ -107,32 +107,30 @@ sub start_server {
     close STDOUT;
     close STDERR;
     $0 .= ' --daemon';                         # server process name
-    server_main($socket_fh);
+
+    server_main($listenfh);                    # never returns
     exit 0;
 }
 
 sub server_main {
-    my ($server) = @_;
-
-    # Wait until there's input on any incoming connection.
-    my $inputs = IO::Select->new($server);
-    while (my @ready = $inputs->can_read) {
-        foreach my $fh (@ready) {
-            if ($fh == $server) {              # client connected
+    my ($listenfh) = @_;
+    my $sockets = IO::Select->new($listenfh);  # wait for input on sockets
+    while (my @ready = $sockets->can_read) {
+        foreach my $fh (@ready) {              #   for each input
+            if ($fh == $listenfh) {            #      client connected
                 print "(client connected)\n";
-                my $new = $server->accept;
-                $inputs->add($new) if $new;
+                my $clientfh = $listenfh->accept;
+                $sockets->add($clientfh) if $clientfh;
                 next;
             }
-            my $line = <$fh>;
-            if (not defined $line) {           # client disconnected
+            defined(my $line = <$fh>) or do {  #      client disconnected
                 print "(client disconnected)\n";
-                $inputs->remove($fh);
+                $sockets->remove($fh);
                 $fh->close;
                 next;
             };
             chomp $line;
-            print "(from client): $line";      # received input
+            print "(from client): $line\n";    # received input
             print $fh "received '$line'\n";
         }
     }
@@ -157,8 +155,8 @@ if (not $server) {                             # failed to connect
 
 # Wait until there's input from either STDIN or $server.
 print "[Connected to '$socket']\n";
-my $inputs = IO::Select->new(\*STDIN, $server);
-while (my @ready = $inputs->can_read) {
+my $sockets = IO::Select->new(\*STDIN, $server);
+while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
         defined(my $x = <$fh>) or exit;    # exit on ^D
         if ($fh == $server) {
