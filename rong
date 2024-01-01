@@ -47,6 +47,35 @@ sub create_tempdir {
     return $dir;
 }
 
+# Used by client to connect to server.
+sub connection_socket {
+    my ($socket_path) = @_;
+    my $fh = IO::Socket::UNIX->new(
+        Type => SOCK_STREAM(),
+        Peer => $socket_path,
+    );
+    $fh->autoflush(1) if $fh;
+    return $fh;
+}
+
+# Used by server to listen for new client connections.
+sub listening_socket {
+    my ($socket_path) = @_;
+    if (-e $socket_path) {
+        -S $socket_path
+            or die "Will not delete non-socket file '$socket_path'\n";
+        unlink $socket_path
+            or die "Cannot delete previous socket '$socket_path': $!\n";
+    }
+    my $fh = IO::Socket::UNIX->new(
+        Listen => 1,
+        Type => SOCK_STREAM(),
+        Local => $socket_path,
+    );
+    $fh->autoflush(1) if $fh;
+    return $fh;
+}
+
 sub start_server {
     my ($socket_path) = @_;
 
@@ -80,35 +109,6 @@ sub start_server {
     $0 .= ' --daemon';                         # server process name
     server_main($socket_fh);
     exit 0;
-}
-
-# Used by client to connect to server.
-sub connection_socket {
-    my ($socket_path) = @_;
-    my $fh = IO::Socket::UNIX->new(
-        Type => SOCK_STREAM(),
-        Peer => $socket_path,
-    );
-    $fh->autoflush(1) if $fh;
-    return $fh;
-}
-
-# Used by server to listen for new client connections.
-sub listening_socket {
-    my ($socket_path) = @_;
-    if (-e $socket_path) {
-        -S $socket_path
-            or die "Will not delete non-socket file '$socket_path'\n";
-        unlink $socket_path
-            or die "Cannot delete previous socket '$socket_path': $!\n";
-    }
-    my $fh = IO::Socket::UNIX->new(
-        Listen => 1,
-        Type => SOCK_STREAM(),
-        Local => $socket_path,
-    );
-    $fh->autoflush(1) if $fh;
-    return $fh;
 }
 
 sub server_main {
