@@ -12,7 +12,7 @@
 ** TODO What format?
    When one just wants to push a large amount of text, should there be a binary
    mode? (Without escaping and stuff.)
-* [1/9] Server
+* [2/8] Server
 ** DONE Listen to multiple incoming connections (without threading)
    CLOSED: [2023-12-31 Sun 15:49]
    This is done using IO::Select, and the code was adapted from final example
@@ -75,7 +75,13 @@
     `close` -- Even though the daemon has no controlling terminal, it may still
     have open file descriptors on a terminal, and these can cause trouble. For
     reliable operation, close the system file descriptors.
-** [0/2] Simple subcommands
+** DONE Simple logging to tempdir
+   CLOSED: [2024-01-01 Mon 11:02]
+   Store a log as a buffer? Log to a file? Write status stuff into
+   notifications? Have a client log mode, so that all error messages are sent
+   to all log-receiving clients?
+** [0/3] Simple subcommands
+*** TODO `rong FILE`
 *** TODO `rong cat`
 *** TODO 'kill' -- to kill server
 ** TODO Use Perl -T (taint flag) for the server
@@ -125,10 +131,6 @@
      systems programming. The system sends your process a SIGCHLD when one of
      its child processes stops running - or, more likely, when that child exits.
      See Recipe 16.19 for more on SIGCHLD.
-** TODO Logging?
-   Store a log as a buffer? Log to a file? Write status stuff into
-   notifications? Have a client log mode, so that all error messages are sent
-   to all log-receiving clients?
 * [1/3] Client
 ** TODO Change directory to root
    Clients should remember their starting directory, but change dir to '/' so
