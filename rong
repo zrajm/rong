@@ -16,8 +16,8 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.4';                          # https://semver.org/
-our $VERSION_DATE='1 January 2024';
+our $VERSION='0.0.5';                          # https://semver.org/
+our $VERSION_DATE='2 January 2024';
 our $CREATED_DATE='28 December 2023'; # don't change!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]...
@@ -173,7 +173,7 @@ sub server_main {
 
 my $tempdir = create_tempdir();
 my $socket = "$tempdir/default";
-my $logfile = "$tempdir/server.log";
+my $logfile = "$socket.log";
 
 $SIG{__DIE__} = sub {
     my ($name) = $0 =~ m#([^/]*$)#;
