@@ -82,10 +82,18 @@
    to all log-receiving clients?
 ** DONE Git commit hook to validate $VERSION before commit
    CLOSED: [2024-01-01 Mon 15:55]
-** [0/3] Simple subcommands
+** [0/4] Simple subcommands
 *** TODO `rong FILE`
 *** TODO `rong cat`
 *** TODO 'kill' -- to kill server
+*** TODO 'start-server' start background daemon w/o client
+    This starts the daemon process and then immediately exists without
+    creating, starting a client. (Under normal circumstances this command is
+    not needed since a server if it isn't already running, when starting a
+    client.)
+
+    Note: In the future we might want a way to name the server socket, so that
+    user may run multiple daemons at the same time.
 ** TODO Use Perl -T (taint flag) for the server
    (Manpage perlipc says this is a good idea.)
 ** TODO Client authentication

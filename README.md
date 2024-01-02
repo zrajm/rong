@@ -1,4 +1,4 @@
-# Rong, The Daemonic Headless Editor
+# Rong, A Daemonic Headless Editor
 
 > “Write in Rong” *or* “It’s Rong to be headless.”
 
@@ -12,5 +12,8 @@ To check out this project and install the recommended Git hooks, use:
     git clone git@github.com:zrajm/rong.git
     cd rong
     git config --local core.hooksPath .githooks/
+
+This will add a `pre-commit` hook that tries to make sure you have updated the
+`$VERSION` and `$VERSION_DATE` variables in Rong before committing.
 
 <!--[eof]-->
