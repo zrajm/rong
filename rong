@@ -16,7 +16,7 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.5';                          # https://semver.org/
+our $VERSION='0.0.6';                          # https://semver.org/
 our $VERSION_DATE='2 January 2024';
 our $CREATED_DATE='28 December 2023'; # don't change!
 our $USAGE = <<'USAGE_END';
@@ -106,42 +106,47 @@ sub listening_socket {
 sub start_server {
     my ($socket_path, $logfile) = @_;
 
-    # Create socket for listening to new clients (it's inherited by child
-    # processes). This is done BEFORE forking avoid race where child tries to
-    # connect and listening socket isn't yet there.
+    # If server is already running, return connection to that.
+    if (my $clientfh = connection_socket($socket_path)) {
+        return $clientfh;
+    }
+
+    # Create server's listening socket to which new clients connect (it's
+    # inherited by child processes). Done BEFORE forking avoid race condition
+    # where child tries to connect and listening socket isn't yet there.
     my $listenfh = listening_socket($socket_path)
-        or die "Cannot create server's listening socket: $!";
+        or die("Cannot create socket '$socket_path': $IO::Socket::errstr\n");
 
     # Start intermediate process (session leader in new session).
     defined(my $inter_pid = fork) or die "Cannot fork intermediate: $!\n";
-    if ($inter_pid) {                          # in client:
-        close $listenfh;                       #   close listening socket
-        wait;                                  #   reap intermediate process
-        return;
-    }
-    POSIX::setsid or die "Cannot make process session leader: $!";
+    if ($inter_pid == 0) {                     # in intermediate
+        POSIX::setsid or die "Cannot make process session leader: $!";
 
-    # Start server process.
-    defined(my $server_pid = fork) or die "Cannot fork server: $!\n";
-    if ($server_pid) {                         # in intermediate
-        exit;
+        # Start server process.
+        defined(my $server_pid = fork) or die "Cannot fork server: $!\n";
+        if ($server_pid == 0) {                # in server
+            $0 .= ' --daemon';                 #   server process name
+            {
+                open(my $fh, '>>', $logfile)
+                    or die "Cannot open logfile '$logfile': $!\n";
+                $fh->autoflush(1);
+                select($fh);
+            }
+            umask(0) or die "Cannot change umask to '0': $!\n";
+            chdir('/') or die "Cannot change directory to '/': $!\n";
+            close STDIN;
+            close STDOUT;
+            close STDERR;
+            server_main($listenfh);            #   never returns
+            exit 0;
+        }
+        exit 0;
     }
 
-    # I am now the server.
-    {
-        open(my $fh, '>>', $logfile)
-            or die "Cannot open logfile '$logfile': $!\n";
-        $fh->autoflush(1);
-        select($fh);
-    }
-    umask(0) or die "Cannot change umask to '0': $!\n";
-    chdir('/') or die "Cannot change directory to '/': $!\n";
-    close STDIN;
-    close STDOUT;
-    close STDERR;
-    $0 .= ' --daemon';                         # server process name
-    server_main($listenfh);                    # never returns
-    exit 0;
+    # Client process (original process).
+    close $listenfh;                           # close listening socket
+    wait;                                      # reap intermediate process
+    return connection_socket($socket_path)     # connect to new server
 }
 
 sub server_main {
@@ -194,22 +199,15 @@ while (@ARGV) {
 die "Too many arguments\n" if @file;
 
 # Connect to server.
-my $server = connection_socket($socket);
-if (not $server) {                             # failed to connect
-    print "Starting server process\n";
-    start_server($socket, $logfile);           #   start server
-    $server = connection_socket($socket)       #   and try to connect again
-        or die "Cannot connect to server\n";
-} else {
-    print "Server already running\n";
-}
+my $server = start_server($socket, $logfile)
+    or die("Cannot connect to socket '$socket': $IO::Socket::errstr\n");
 
-# Wait until there's input from either STDIN or $server.
+# Client: Wait until there's input from either STDIN or $server.
 print "[Connected to '$socket']\n";
 my $sockets = IO::Select->new(\*STDIN, $server);
 while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
-        defined(my $x = <$fh>) or exit;    # exit on ^D
+        defined(my $x = <$fh>) or exit;    # ^D from STDIN = exit
         if ($fh == $server) {
             print "(from server): $x";
         } else {
