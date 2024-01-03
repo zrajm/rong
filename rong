@@ -16,8 +16,8 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.6';                          # https://semver.org/
-our $VERSION_DATE='2 January 2024';
+our $VERSION='0.0.7';                          # https://semver.org/
+our $VERSION_DATE='3 January 2024';
 our $CREATED_DATE='28 December 2023'; # don't change!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]...
@@ -120,8 +120,7 @@ sub start_server {
     # Start intermediate process (session leader in new session).
     defined(my $inter_pid = fork) or die "Cannot fork intermediate: $!\n";
     if ($inter_pid == 0) {                     # in intermediate
-        POSIX::setsid or die "Cannot make process session leader: $!";
-
+        (POSIX::setsid != -1) or die "Cannot start new session: $!";
         # Start server process.
         defined(my $server_pid = fork) or die "Cannot fork server: $!\n";
         if ($server_pid == 0) {                # in server
