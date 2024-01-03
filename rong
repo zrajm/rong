@@ -16,7 +16,7 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.8';                          # https://semver.org/
+our $VERSION='0.0.9';                          # https://semver.org/
 our $VERSION_DATE='3 January 2024';
 our $CREATED_DATE='28 December 2023'; # don't change!
 our $USAGE = <<'USAGE_END';
@@ -154,22 +154,24 @@ sub server_main {
     while (my @ready = $sockets->can_read) {
         foreach my $fh (@ready) {              #   for each input
             if ($fh == $listenfh) {            #      client connected
-                print "(client connected)\n";
                 my $clientfh = $listenfh->accept;
                 if ($clientfh) {
                     $clientfh->autoflush(1);
                     $sockets->add($clientfh);
+                    my $fn = fileno($clientfh);
+                    print "(client $fn connected)\n";
                 }
                 next;
             }
+            my $fn = fileno($fh);
             defined(my $line = <$fh>) or do {  #      client disconnected
-                print "(client disconnected)\n";
+                print "(client $fn disconnected)\n";
                 $sockets->remove($fh);
                 $fh->close;
                 next;
             };
             chomp $line;
-            print "(from client): $line\n";    # received input
+            print "(client $fn sent): $line\n";# received input
             print $fh "received '$line'\n";
         }
     }

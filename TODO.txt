@@ -12,7 +12,7 @@
 ** TODO What format?
    When one just wants to push a large amount of text, should there be a binary
    mode? (Without escaping and stuff.)
-* [3/9] Server
+* [3/10] Server
 ** DONE Listen to multiple incoming connections (without threading)
    CLOSED: [2023-12-31 Sun 15:49]
    This is done using IO::Select, and the code was adapted from final example
@@ -82,6 +82,7 @@
    to all log-receiving clients?
 ** DONE Git commit hook to validate $VERSION before commit
    CLOSED: [2024-01-01 Mon 15:55]
+** TODO Output server STDOUT and STDERR to logfile
 ** [0/4] Simple subcommands
 *** TODO `rong FILE`
 *** TODO `rong cat`
