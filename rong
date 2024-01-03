@@ -16,7 +16,7 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.7';                          # https://semver.org/
+our $VERSION='0.0.8';                          # https://semver.org/
 our $VERSION_DATE='3 January 2024';
 our $CREATED_DATE='28 December 2023'; # don't change!
 our $USAGE = <<'USAGE_END';
@@ -156,7 +156,10 @@ sub server_main {
             if ($fh == $listenfh) {            #      client connected
                 print "(client connected)\n";
                 my $clientfh = $listenfh->accept;
-                $sockets->add($clientfh) if $clientfh;
+                if ($clientfh) {
+                    $clientfh->autoflush(1);
+                    $sockets->add($clientfh);
+                }
                 next;
             }
             defined(my $line = <$fh>) or do {  #      client disconnected
