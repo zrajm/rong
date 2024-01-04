@@ -12,7 +12,7 @@
 ** TODO What format?
    When one just wants to push a large amount of text, should there be a binary
    mode? (Without escaping and stuff.)
-* [9/21] Server
+* [10/21] Server
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
@@ -97,10 +97,25 @@
 
     Note: In the future we might want a way to name the server socket, so that
     user may run multiple daemons at the same time.
-** TODO Redirect server STDERR to logfile
+** DONE Redirect server STDERR to logfile
+   CLOSED: [2024-01-04 Thu 09:42]
    So that error messages wind up there. (STDOUT is not important, since the
    logfile filehandle is selected and the output of print() and friends
    therefore already winds up in the logfile.)
+
+   Took the approach exemplified by the following snippet in the perlipc(1)
+   manpage (except that I'm closing STDIN rather than reading from /dev/null).
+
+       sub daemonize {
+           chdir("/")                     || die "can't chdir to /: $!";
+           open(STDIN,  "<", "/dev/null") || die "can't read /dev/null: $!";
+           open(STDOUT, ">", "/dev/null") || die "can't write /dev/null: $!";
+           defined(my $pid = fork())      || die "can't fork: $!";
+           exit if $pid;              # non-zero now means I am the parent
+           (setsid() != -1)           || die "Can't start a new session: $!";
+           open(STDERR, ">&", STDOUT) || die "can't dup stdout: $!";
+       }
+ 
 ** TODO Keep track of client-specific data
    E.g. login info, maybe more later.
 ** TODO On startup make sure any already existing tempdir is chmod 0700

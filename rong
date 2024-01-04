@@ -16,8 +16,8 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.9';                          # https://semver.org/
-our $VERSION_DATE='3 January 2024';
+our $VERSION='0.0.10';                          # https://semver.org/
+our $VERSION_DATE='4 January 2024';
 our $CREATED_DATE='28 December 2023'; # don't change!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]...
@@ -125,17 +125,13 @@ sub start_server {
         defined(my $server_pid = fork) or die "Cannot fork server: $!\n";
         if ($server_pid == 0) {                # in server
             $0 .= ' --daemon';                 #   server process name
-            {
-                open(my $fh, '>>', $logfile)
-                    or die "Cannot open logfile '$logfile': $!\n";
-                $fh->autoflush(1);
-                select($fh);
-            }
             umask(0) or die "Cannot change umask to '0': $!\n";
             chdir('/') or die "Cannot change directory to '/': $!\n";
+            open(STDOUT, '>>', $logfile)
+                or die "Cannot open logfile '$logfile': $!\n";
+            open(STDERR, '>&', STDOUT)
+                or die "Cannot redirect STDERR to logfile '$logfile': $!\n";
             close STDIN;
-            close STDOUT;
-            close STDERR;
             server_main($listenfh);            #   never returns
             exit 0;
         }
