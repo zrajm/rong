@@ -1,6 +1,23 @@
 -*- org -*-
 
-* [0/6] Protocol
+* [1/9] Protocol
+** DONE Format: The basics
+   CLOSED: [2024-01-04 Thu 10:43]
+   + Server starts when client connect, sends `OK rong <VERSION> <SOCKET>`
+   + All server responses is single line, starting with 'OK' or 'ERR'
+** TODO Command: `load`
+** TODO Format: Multi-line server response? (for interactive `help` command)
+   I want the server to be able to talk to a user for exploratory purposes.
+   Thus there should always be REPL-mode, and it should have a `help` command.
+   For this to work server needs to be able to respond with multi-line output,
+   what should this look like? (How do other protocols do this?)
+
+   The help output is this mode should preferably be the same as with command
+   line help, e.g. `rong help load` should show the same text as `help load` in
+   REPL-mode.
+** TODO Format: Raw mode? (for visual editor clients)
+   Telnet protocol apparently have a line-based and a raw mode. How does that
+   work?
 ** TODO Selection commands
 ** TODO Cursor move commands
 ** TODO Text insertion
@@ -9,10 +26,7 @@
    This needs to be specified on a file level. Also, a client that isn't
    displaying a certain file should be able to unsubscribe, then resubscribe
    and ask for updates when a user starts editing that file again.
-** TODO What format?
-   When one just wants to push a large amount of text, should there be a binary
-   mode? (Without escaping and stuff.)
-* [10/21] Server
+* [11/22] Server
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
@@ -85,6 +99,10 @@
    to all log-receiving clients?
 ** DONE Git commit hook to validate $VERSION before commit
    CLOSED: [2024-01-01 Mon 15:55]
+** DONE Server greeting
+   CLOSED: [2024-01-04 Thu 10:43]
+   Upon connecting the server should send a greeting containing server name and
+   version number. E.g. `OK rong 0.0.10 /tmp/rong-1000/default`.
 ** [0/4] Simple subcommands
 *** TODO `rong FILE`
 *** TODO `rong cat`
@@ -178,16 +196,27 @@
 
     Is there a way to restart the server if versions if needed? (That is, keep
     state, but reload the server's code?)
-* [1/3] Client
+* [1/5] Client
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
+** DONE Read from both STDIN and server at same time
+   CLOSED: [2023-12-31 Sun 15:49]
+   This is done using IO::Select.
+** TODO Send single server commands
+   The client should be able to connect, some specified command(s) then
+   disconnect, rather than always going into an interactive REPL-mode.
 ** TODO Change directory to root
    Clients should remember their starting directory, but change dir to '/' so
    that their original dir can be unmounted etc.
 ** TODO Should shutdown() be used when closing socket?
    https://docstore.mik.ua/orelly/perl/cookbook/ch17_10.htm
-** DONE Read from both STDIN and server at same time
-   CLOSED: [2023-12-31 Sun 15:49]
-   This is done using IO::Select.
+** [0/1] FAR-FLUNG FUTURE FEATURES
+*** TODO Verify server version when connecting
+    When connecting the client should verify the server version relative to the
+    client's version, only allowing the PATCH (and maybe the MINOR?) number to
+    differ.
+
+    Or, maybe we would reload the daemon, keeping all data but update the code?
+    Would that be possible?
 * [eof]

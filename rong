@@ -16,7 +16,7 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.10';                          # https://semver.org/
+our $VERSION='0.0.11';                          # https://semver.org/
 our $VERSION_DATE='4 January 2024';
 our $CREATED_DATE='28 December 2023'; # don't change!
 our $USAGE = <<'USAGE_END';
@@ -132,7 +132,7 @@ sub start_server {
             open(STDERR, '>&', STDOUT)
                 or die "Cannot redirect STDERR to logfile '$logfile': $!\n";
             close STDIN;
-            server_main($listenfh);            #   never returns
+            server_main($listenfh, $socket_path);# never returns
             exit 0;
         }
         exit 0;
@@ -145,7 +145,8 @@ sub start_server {
 }
 
 sub server_main {
-    my ($listenfh) = @_;
+    my ($listenfh, $listenfile) = @_;
+    my ($program_name) = __FILE__ =~ m#([^/]*$)#;
     my $sockets = IO::Select->new($listenfh);  # wait for input on sockets
     while (my @ready = $sockets->can_read) {
         foreach my $fh (@ready) {              #   for each input
@@ -156,6 +157,7 @@ sub server_main {
                     $sockets->add($clientfh);
                     my $fn = fileno($clientfh);
                     print "(client $fn connected)\n";
+                    printf $clientfh "OK $program_name $VERSION $listenfile\n";
                 }
                 next;
             }
@@ -168,7 +170,7 @@ sub server_main {
             };
             chomp $line;
             print "(client $fn sent): $line\n";# received input
-            print $fh "received '$line'\n";
+            print $fh "OK ($line)\n";
         }
     }
 }
@@ -203,15 +205,13 @@ my $server = start_server($socket, $logfile)
     or die("Cannot connect to socket '$socket': $IO::Socket::errstr\n");
 
 # Client: Wait until there's input from either STDIN or $server.
-print "[Connected to '$socket']\n";
 my $sockets = IO::Select->new(\*STDIN, $server);
 while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
         defined(my $x = <$fh>) or exit;    # ^D from STDIN = exit
-        if ($fh == $server) {
-            print "(from server): $x";
-        } else {
-            print "(from STDIN): $x";
+        if ($fh == $server) {              # from server -> write to STDOUT
+            print $x;
+        } else {                           # from STDIN -> write to server
             print $server $x;
         }
     }
