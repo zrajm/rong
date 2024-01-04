@@ -99,22 +99,6 @@
    to all log-receiving clients?
 ** DONE Git commit hook to validate $VERSION before commit
    CLOSED: [2024-01-01 Mon 15:55]
-** DONE Server greeting
-   CLOSED: [2024-01-04 Thu 10:43]
-   Upon connecting the server should send a greeting containing server name and
-   version number. E.g. `OK rong 0.0.10 /tmp/rong-1000/default`.
-** [0/4] Simple subcommands
-*** TODO `rong FILE`
-*** TODO `rong cat`
-*** TODO 'kill' -- to kill server
-*** TODO 'start-server' start background daemon w/o client
-    This starts the daemon process and then immediately exists without
-    creating, starting a client. (Under normal circumstances this command is
-    not needed since a server if it isn't already running, when starting a
-    client.)
-
-    Note: In the future we might want a way to name the server socket, so that
-    user may run multiple daemons at the same time.
 ** DONE Redirect server STDERR to logfile
    CLOSED: [2024-01-04 Thu 09:42]
    So that error messages wind up there. (STDOUT is not important, since the
@@ -134,6 +118,22 @@
            open(STDERR, ">&", STDOUT) || die "can't dup stdout: $!";
        }
  
+** DONE Server greeting
+   CLOSED: [2024-01-04 Thu 10:43]
+   Upon connecting the server should send a greeting containing server name and
+   version number. E.g. `OK rong 0.0.10 /tmp/rong-1000/default`.
+** [0/4] Simple subcommands
+*** TODO `rong FILE`
+*** TODO `rong cat`
+*** TODO 'kill' -- to kill server
+*** TODO 'start-server' start background daemon w/o client
+    This starts the daemon process and then immediately exists without
+    creating, starting a client. (Under normal circumstances this command is
+    not needed since a server if it isn't already running, when starting a
+    client.)
+
+    Note: In the future we might want a way to name the server socket, so that
+    user may run multiple daemons at the same time.
 ** TODO Keep track of client-specific data
    E.g. login info, maybe more later.
 ** TODO On startup make sure any already existing tempdir is chmod 0700
@@ -196,13 +196,28 @@
 
     Is there a way to restart the server if versions if needed? (That is, keep
     state, but reload the server's code?)
-* [1/5] Client
+* [2/6] Client
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
 ** DONE Read from both STDIN and server at same time
    CLOSED: [2023-12-31 Sun 15:49]
    This is done using IO::Select.
+** DONE Verify server greeting when connecting
+   CLOSED: [2024-01-05 Fri 00:30]
+   When a client connects to the server it should verify the returned greeting
+   using something like:
+
+       # Verify server greeting.
+       if ($sockets->can_read) {
+           defined(my $greeting = <$server>)
+               or die "Cannot read server greeting: $!\n";
+          die "Cannot understand server greeting\n",
+              "    expected: OK rong #.#.# $socket\n",
+              "    but got : $greeting"
+              unless $greeting =~ /^OK rong \d+\.\d+\.\d+ \Q$socket\E$/;
+       }
+ 
 ** TODO Send single server commands
    The client should be able to connect, some specified command(s) then
    disconnect, rather than always going into an interactive REPL-mode.
