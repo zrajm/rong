@@ -16,11 +16,11 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.12';                          # https://semver.org/
+our $VERSION='0.0.13';                          # https://semver.org/
 our $VERSION_DATE='5 January 2024';
 our $CREATED_DATE='28 December 2023'; # don't change!
 our $USAGE = <<'USAGE_END';
-Usage: rong [OPTION]...
+Usage: rong [OPTION]... [FILE]...
 A daemonic headless editor.
 
 Options:
@@ -198,7 +198,6 @@ while (@ARGV) {
     /^-./ and die "Unrecognized option '$_'\n";
     push(@file, $_);
 }
-die "Too many arguments\n" if @file;
 
 # Connect to server.
 my $server = start_server($socket, $logfile)
@@ -213,6 +212,22 @@ if ($sockets->can_read) {
         "    expected: OK rong #.#.# $socket\n",
         "    but got : $greeting"
         unless $greeting =~ /^OK rong \d+\.\d+\.\d+ \Q$socket\E$/;
+}
+
+# Send command(s) to server.
+if (@file) {
+    my $cwd = POSIX::getcwd();
+    for my $file (@file) {
+        if ($sockets->can_write) {
+            print $server "load '$cwd/$file'\n";
+        }
+        if ($sockets->can_read) {
+            defined(my $reply = <$server>)
+                or die "Server terminated connection: $!\n";
+            print $reply;
+        }
+    }
+    exit 0;
 }
 
 # Client: Wait until there's input from either STDIN or $server.

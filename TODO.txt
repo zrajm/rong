@@ -196,7 +196,7 @@
 
     Is there a way to restart the server if versions if needed? (That is, keep
     state, but reload the server's code?)
-* [2/6] Client
+* [3/6] Client
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
@@ -218,7 +218,8 @@
               unless $greeting =~ /^OK rong \d+\.\d+\.\d+ \Q$socket\E$/;
        }
  
-** TODO Send single server commands
+** DONE Send single server commands
+   CLOSED: [2024-01-05 Fri 04:18]
    The client should be able to connect, some specified command(s) then
    disconnect, rather than always going into an interactive REPL-mode.
 ** TODO Change directory to root
