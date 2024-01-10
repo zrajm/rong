@@ -16,7 +16,7 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.15';                         # https://semver.org/
+our $VERSION='0.0.16';                         # https://semver.org/
 our $VERSION_DATE='10 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -26,6 +26,17 @@ A daemonic headless editor.
 Options:
   -h, --help      Display this help and exit
   -V, --version   Output version information and exit
+
+Commands:
+  cat FILE...     Output FILE(s) on standard output
+  cd DIR          Change directory used for relative filenames
+  help            Display list of commands
+  kill FILE...    Unload FILE(s)
+  list            List loaded files
+  [load] FILE...  Load FILE(s) (default command)
+  save FILE...    Save FILE(s)
+
+All commands (except 'load') operates on files loaded into Rong.
 USAGE_END
 
 ###############################################################################
@@ -130,8 +141,108 @@ sub start_server {
     return connection_socket($socket_path)     # connect to new server
 }
 
+{
+    package rong;
+
+    sub load_file {
+        my ($file) = @_;
+        open(my $fh, '<', $file) or die "Cannot load file: $!\n";
+        # FIXME: catch errors in <$fh> too
+        my @buf = <$fh>;
+        close($fh) or die "Cannot load file: $!\n";
+        return \@buf;
+    }
+
+    sub save_file {
+        my ($file, $data) = @_;
+        open(my $fh, '>', $file) or die "Cannot save file: $!\n";
+        # FIXME: catch errors in print() too
+        print $fh @{ $data };
+        close($fh) or die "Cannot save file: $!\n";
+    }
+
+    my %buf;
+    my %opt = (pwd => POSIX::getcwd());
+    my %cmd;
+
+    # Here say() & print() goes to client; warn() goes to log; die() exits with
+    # error message.
+    %cmd = (
+        cat => sub {
+            my ($file) = @_;
+            die "File not loaded\n" if not exists $buf{$file};
+            print @{$buf{$file}};
+        },
+        cd => sub {
+            my ($dir) = @_;
+            # Evaluate new pwd, die() if not cd:able.
+            say $opt{pwd} = $dir // $opt{pwd};
+        },
+        help => sub {
+            say join(' ', sort keys %cmd);
+        },
+        kill => sub {
+            my ($file) = @_;
+            die "File not loaded\n" if not exists $buf{$file};
+            delete $buf{$file};
+        },
+        list => sub {
+            die "No args allowed\n" if @_;
+            say join("\n", map { escape($_) } sort keys(%buf));
+        },
+        load => sub {
+            my ($file) = @_;
+            die "File already loaded\n" if exists $buf{$file};
+            $buf{$file} = load_file("$opt{pwd}/$file");
+        },
+        save => sub {
+            my ($file) = @_;
+            die "File not loaded\n" if not exists $buf{$file};
+            save_file("$opt{pwd}/$file", $buf{$file});
+        },
+    );
+
+    sub subcommands { keys(%cmd) }
+
+    sub escape {
+        local ($_) = @_;
+        my %c = ("\a"=>'\a', "\b"=>'\b', "\e"=>'\e', "\f"=>'\f',
+                 "\n"=>'\n', "\r"=>'\r', "\t"=>'\t', "\\"=>'\\\\', '"' =>'\"');
+        return s# [[:cntrl:]\\"] # $c{$&} // sprintf('\\x%02X', ord $&) #gex
+            ? "\"$_\"" : $_;                   # was escaped? then quote!
+    }
+    sub unescape {
+        local ($_) = @_;
+        $_ = /^"(.*)"$/ ? $1 : $_;
+        s#\\([abefnrt\\\"]|x[0-9A-F]{2})# eval "\"$&\"" #ge;
+        return $_;
+    }
+    sub serialize { join ' ', map { escape($_) } @_ }
+    sub deserialize {
+        local ($_) = @_;
+        my @x = m/\G( "(?:[^"\\]|\\.)+" |      # double quoted
+                      [^[:cntrl:][:space:]\\"]+# other words
+                  )(?:\h+|$)/gx
+                      or die "Cannot deserialize string '$_'\n";
+        return map { unescape($_) } @x;
+    }
+
+    # Result should always end in one line starting with 'OK' or 'ERR'.
+    sub invoke {
+        my ($line) = @_;
+        my ($cmd, @arg) = deserialize($line);
+        eval { exists($cmd{$cmd}) ? $cmd{$cmd}(@arg) : undef } // do {
+            chomp(my $err = $@ || "Unrecognized command");
+            say "ERR $err";
+            return ();
+        };
+        say "OK";
+    }
+}
+
 sub server_main {
     my ($listenfh, $listenfile) = @_;
+    local $SIG{__DIE__} = 'DEFAULT';
     my $sockets = IO::Select->new($listenfh);  # wait for input on sockets
     while (my @ready = $sockets->can_read) {
         foreach my $fh (@ready) {              #   for each input
@@ -143,7 +254,7 @@ sub server_main {
                     my $fn = fileno($clientfh);
                     my ($program) = __FILE__ =~ m#([^/]*$)#;
                     warn "(client $fn connected)\n";
-                    print $clientfh "OK $program $VERSION $listenfile\n";
+                    say $clientfh "OK $program $VERSION $listenfile";
                 }
                 next;
             }
@@ -157,7 +268,7 @@ sub server_main {
             chomp $line;
             warn "(client $fn sent): $line\n"; # received input
             select($fh);
-            print "OK ($line)\n";
+            rong::invoke($line);
         }
     }
 }
@@ -203,15 +314,29 @@ if ($sockets->can_read) {
 
 # Send command(s) to server.
 if (@arg) {
-    my $cwd = POSIX::getcwd();
-    for my $arg (@arg) {
+    # 1st command line arg is command (if recognized) otherwise use 'load'.
+    my $cmd = ($arg[0] =~ /^(?:@{[ join('|', rong::subcommands) ]})$/)
+        ? shift(@arg) : 'load';
+
+    for my $arg (@arg ? @arg : undef) {
+        my $full_cmd = rong::serialize($cmd, $arg // ());
         if ($sockets->can_write) {
-            print $server "load '$cwd/$arg'\n";
+            say $server $full_cmd;
         }
         if ($sockets->can_read) {
-            defined(my $reply = <$server>)
-                or die "Server terminated connection: $!\n";
-            print $reply;
+            defined($server->recv(my $reply, 1024*1024))
+                or die "Cannot read server response: $IO::Socket::errstr\n";
+            chomp $reply;
+            $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m; chomp($reply);
+            my ($status, $msg) = ($1, $2);
+            if ($status eq 'OK') {
+                say $reply if $reply;
+                #say "$status $msg";
+            } elsif ($status eq 'ERR') {
+                say "$full_cmd: $msg";
+            } else {
+                say "$full_cmd: Unknown server response: $reply";
+            }
         }
     }
     exit 0;
@@ -222,10 +347,12 @@ print $greeting;
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
-        defined(my $x = <$fh>) or exit;        # ^D from STDIN = exit
         if ($fh == $server) {                  # from server -> write to STDOUT
+            defined($fh->recv(my $x, 1024*1024))
+                or die "Cannot read from daemon: $IO::Socket::errstr\n";
             print $x;
         } else {                               # from STDIN -> write to server
+            defined(my $x = <$fh>) or exit;    # ^D from STDIN = exit
             print $server $x;
         }
     }

@@ -1,11 +1,19 @@
 -*- org -*-
 
-* [1/9] Protocol
+* [1/12] Protocol
 ** DONE Format: The basics
    CLOSED: [2024-01-04 Thu 10:43]
    + Server starts when client connect, sends `OK rong <VERSION> <SOCKET>`
    + All server responses is single line, starting with 'OK' or 'ERR'
-** TODO Command: `load`
+** TODO Escaping should use same schema as shell or 'ls' command
+   To make it make when using `rong list`.
+** TODO Use sysread for sockets?
+   Switched to using recv() for the sockets, but it'd be nicer to use something
+   that can be used on both STDIN and socket, to simplify the client REPL-loop.
+
+   Sysread doesn't allow Unicode, but if set up so that just raw bytes are
+   shuffled over the socket that shouldn't matter. (The benefit of this is to
+   avoid hangs.)
 ** TODO Format: Multi-line server response? (for interactive `help` command)
    I want the server to be able to talk to a user for exploratory purposes.
    Thus there should always be REPL-mode, and it should have a `help` command.
@@ -26,7 +34,11 @@
    This needs to be specified on a file level. Also, a client that isn't
    displaying a certain file should be able to unsubscribe, then resubscribe
    and ask for updates when a user starts editing that file again.
-* [11/22] Server
+** TODO Separate protocol logic from server specifics
+   The client and server skeleton logic should be in a separate module, and the
+   specifics should be separated out into its own module.
+** TODO Use File::Spec for filenames and path handling(?)
+* [18/33] Server
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
@@ -122,18 +134,8 @@
    CLOSED: [2024-01-04 Thu 10:43]
    Upon connecting the server should send a greeting containing server name and
    version number. E.g. `OK rong 0.0.10 /tmp/rong-1000/default`.
-** [0/4] Simple subcommands
-*** TODO `rong FILE`
-*** TODO `rong cat`
-*** TODO 'kill' -- to kill server
-*** TODO 'start-server' start background daemon w/o client
-    This starts the daemon process and then immediately exists without
-    creating, starting a client. (Under normal circumstances this command is
-    not needed since a server if it isn't already running, when starting a
-    client.)
-
-    Note: In the future we might want a way to name the server socket, so that
-    user may run multiple daemons at the same time.
+** DONE Escape filename when talking client<->server
+   CLOSED: [2024-01-05 Fri 18:43]
 ** TODO Keep track of client-specific data
    E.g. login info, maybe more later.
 ** TODO On startup make sure any already existing tempdir is chmod 0700
@@ -227,12 +229,73 @@
    that their original dir can be unmounted etc.
 ** TODO Should shutdown() be used when closing socket?
    https://docstore.mik.ua/orelly/perl/cookbook/ch17_10.htm
-** [0/1] FAR-FLUNG FUTURE FEATURES
-*** TODO Verify server version when connecting
-    When connecting the client should verify the server version relative to the
-    client's version, only allowing the PATCH (and maybe the MINOR?) number to
-    differ.
+** [0/2] FAR-FLUNG FUTURE FEATURES
+*** TODO Make client server-version agnostic(?)
+    The client should query the server for allowed syntax for each server
+    command, then use that to check the validity of the command line options.
 
-    Or, maybe we would reload the daemon, keeping all data but update the code?
-    Would that be possible?
+    There's gonna be a variable number of arguments for different server
+    commands. Some will only ever take one arg ('load', 'save' etc.) some zero
+    or one ('cd'), some two ('mv', 'cp' -- moar?).
+
+    Maybe the server greeting could contain the relevant help info? For example
+    something like (sadly, this would make the greeting longer that one line):
+
+        OK rong 0.0.42 /tmp/rong-100/default 0(exit halt help list cd) 1(cd
+            cat kill load save) 2(mv cp)
+ 
+* [6/6] Basic subcommands
+  Server commands only take zero or one arg. Client execute multi-arg commands
+  as one command for each arg (resulting in one 'OK' or 'ERR' for each arg).
+** DONE `rong load FILE...`
+   CLOSED: [2024-01-05 Fri 15:21]
+** DONE `rong list`
+   CLOSED: [2024-01-06 Sat 12:55]
+** DONE `rong kill FILE...`
+   CLOSED: [2024-01-08 Mon 15:01]
+** DONE `rong help`
+   CLOSED: [2024-01-10 Wed 00:55]
+** DONE `rong save FILE`
+   CLOSED: [2024-01-10 Wed 01:04]
+** DONE `rong cat FILE`
+   CLOSED: [2024-01-10 Wed 01:08]
+* TODO `rong cd DIR` & relative filenames
+  Relative filenames should be used everywhere. Hmm? Should we use the clients
+  path as base? Should filtering based on client's path be used instead of
+  something session-y as well?
+
+  File::Spec is a core module. Use that!
+** TODO `load FILE`
+** TODO `list`
+** TODO `kill FILE`
+** TODO `save FILE`
+** TODO `cat FILE`
+* [0/11] Improve subcommands
+** TODO Subcommand functions should not be in hash
+** TODO `rong` (without args) should start server + list buffers
+   This should start the daemon process and then immediately exist the client.
+   (Under normal circumstances this command is not needed since a server if it
+   isn't already running, when starting a client will start it.)
+
+   Note: In the future we might want a way to name the server socket, so that
+   user may run multiple daemons at the same time.
+** TODO `rong repl`
+   There should be a user greeting, with listing of commands also telling that
+   ^C or ^D exists.
+** TODO `rong load` -- Handle read errors
+   Should any catch any errors gotten while reading (in `<$fh>` statement) too.
+** TODO `rong save` -- Handle write errors
+   Should any catch errors gotten while writing (in `print` statement) too.
+** TODO `rong save` -- Make atomic
+** TODO `rong mv`
+** TODO `rong cp`
+** TODO File fingerprinting & checksumming
+*** TODO `rong load` -- Avoid useless reloads
+    This should use fingerprinting, but do a checksum if fingerprint fails.
+    That is, if file is identical to existing one, it should *never* be
+    reloaded. (Instead a message should be given to the user.)
+*** TODO `rong save` -- Avoid useless resaves
+    This should use fingerprinting, but do a checksum if fingerprint fails.
+    That is, if file is identical to existing one, it should *never* be
+    saved again. (Instead a message should be given to the user.)
 * [eof]
