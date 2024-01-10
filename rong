@@ -16,7 +16,7 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.16';                         # https://semver.org/
+our $VERSION='0.0.17';                         # https://semver.org/
 our $VERSION_DATE='10 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -143,6 +143,8 @@ sub start_server {
 
 {
     package rong;
+    use File::Spec;
+    use Cwd;
 
     sub load_file {
         my ($file) = @_;
@@ -161,15 +163,27 @@ sub start_server {
         close($fh) or die "Cannot save file: $!\n";
     }
 
+
     my %buf;
-    my %opt = (pwd => POSIX::getcwd());
+    my %opt = (pwd => Cwd::cwd());
     my %cmd;
+
+    sub abspath {
+        my $file = Cwd::abs_path(File::Spec->catfile($opt{pwd}, shift))
+            or die "Cannot resolve absolute path: $!";
+        return $file;
+    }
+
+    sub relpath {
+        my ($path, $base) = @_;
+        return File::Spec->abs2rel($path, $base);
+    }
 
     # Here say() & print() goes to client; warn() goes to log; die() exits with
     # error message.
     %cmd = (
         cat => sub {
-            my ($file) = @_;
+            my $file = abspath(shift);
             die "File not loaded\n" if not exists $buf{$file};
             print @{$buf{$file}};
         },
@@ -182,21 +196,23 @@ sub start_server {
             say join(' ', sort keys %cmd);
         },
         kill => sub {
-            my ($file) = @_;
+            my $file = abspath(shift);
             die "File not loaded\n" if not exists $buf{$file};
             delete $buf{$file};
         },
         list => sub {
             die "No args allowed\n" if @_;
-            say join("\n", map { escape($_) } sort keys(%buf));
+            say join("\n", map {
+                escape(relpath($_, $opt{pwd}));
+            } sort keys(%buf));
         },
         load => sub {
-            my ($file) = @_;
+            my $file = abspath(shift);
             die "File already loaded\n" if exists $buf{$file};
-            $buf{$file} = load_file("$opt{pwd}/$file");
+            $buf{$file} = load_file($file);
         },
         save => sub {
-            my ($file) = @_;
+            my $file = abspath(shift);
             die "File not loaded\n" if not exists $buf{$file};
             save_file("$opt{pwd}/$file", $buf{$file});
         },

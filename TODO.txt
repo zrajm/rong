@@ -1,12 +1,10 @@
 -*- org -*-
 
-* [1/12] Protocol
+* [1/11] Protocol
 ** DONE Format: The basics
    CLOSED: [2024-01-04 Thu 10:43]
    + Server starts when client connect, sends `OK rong <VERSION> <SOCKET>`
    + All server responses is single line, starting with 'OK' or 'ERR'
-** TODO Escaping should use same schema as shell or 'ls' command
-   To make it make when using `rong list`.
 ** TODO Use sysread for sockets?
    Switched to using recv() for the sockets, but it'd be nicer to use something
    that can be used on both STDIN and socket, to simplify the client REPL-loop.
@@ -38,7 +36,7 @@
    The client and server skeleton logic should be in a separate module, and the
    specifics should be separated out into its own module.
 ** TODO Use File::Spec for filenames and path handling(?)
-* [18/33] Server
+* [12/19] Server
    :PROPERTIES:
    :COOKIE_DATA: todo recursive
    :END:
@@ -199,9 +197,9 @@
     Is there a way to restart the server if versions if needed? (That is, keep
     state, but reload the server's code?)
 * [3/6] Client
-   :PROPERTIES:
-   :COOKIE_DATA: todo recursive
-   :END:
+  :PROPERTIES:
+  :COOKIE_DATA: todo recursive
+  :END:
 ** DONE Read from both STDIN and server at same time
    CLOSED: [2023-12-31 Sun 15:49]
    This is done using IO::Select.
@@ -265,12 +263,17 @@
   something session-y as well?
 
   File::Spec is a core module. Use that!
+** DONE Use absolute paths internally
+   CLOSED: [2024-01-10 Wed 19:29]
+** TODO Handle paths better
+   How to do this? Deal with it on the client side? Or have client send it's
+   current directory to the server as it is connecting?
 ** TODO `load FILE`
 ** TODO `list`
 ** TODO `kill FILE`
 ** TODO `save FILE`
 ** TODO `cat FILE`
-* [0/11] Improve subcommands
+* [0/9] Improve subcommands
 ** TODO Subcommand functions should not be in hash
 ** TODO `rong` (without args) should start server + list buffers
    This should start the daemon process and then immediately exist the client.
@@ -298,4 +301,6 @@
     This should use fingerprinting, but do a checksum if fingerprint fails.
     That is, if file is identical to existing one, it should *never* be
     saved again. (Instead a message should be given to the user.)
+* TODO Escaping should use same schema as shell or 'ls' command
+  To make it make when using `rong list`.
 * [eof]
