@@ -16,7 +16,7 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.14';                         # https://semver.org/
+our $VERSION='0.0.15';                         # https://semver.org/
 our $VERSION_DATE='10 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -114,10 +114,9 @@ sub start_server {
             $0 .= ' --daemon';                 #   server process name
             umask(0) or die "Cannot change umask to '0': $!\n";
             chdir('/') or die "Cannot change directory to '/': $!\n";
-            open(STDOUT, '>>', $logfile)
+            close STDOUT;
+            open(STDERR, '>>', $logfile)
                 or die "Cannot open logfile '$logfile': $!\n";
-            open(STDERR, '>&', STDOUT)
-                or die "Cannot redirect STDERR to logfile '$logfile': $!\n";
             close STDIN;
             server_main($listenfh, $socket_path);# never returns
             exit 0;
@@ -143,21 +142,22 @@ sub server_main {
                     $sockets->add($clientfh);
                     my $fn = fileno($clientfh);
                     my ($program) = __FILE__ =~ m#([^/]*$)#;
-                    print "(client $fn connected)\n";
+                    warn "(client $fn connected)\n";
                     print $clientfh "OK $program $VERSION $listenfile\n";
                 }
                 next;
             }
             my $fn = fileno($fh);
             defined(my $line = <$fh>) or do {  #      client disconnected
-                print "(client $fn disconnected)\n";
+                warn "(client $fn disconnected)\n";
                 $sockets->remove($fh);
                 $fh->close;
                 next;
             };
             chomp $line;
-            print "(client $fn sent): $line\n";# received input
-            print $fh "OK ($line)\n";
+            warn "(client $fn sent): $line\n"; # received input
+            select($fh);
+            print "OK ($line)\n";
         }
     }
 }
