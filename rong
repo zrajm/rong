@@ -16,16 +16,16 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.13';                          # https://semver.org/
-our $VERSION_DATE='5 January 2024';
-our $CREATED_DATE='28 December 2023'; # don't change!
+our $VERSION='0.0.14';                         # https://semver.org/
+our $VERSION_DATE='10 January 2024';
+our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [FILE]...
 A daemonic headless editor.
 
 Options:
-  -h, --help             Display this help and exit
-  -V, --version          Output version information and exit
+  -h, --help      Display this help and exit
+  -V, --version   Output version information and exit
 USAGE_END
 
 ###############################################################################
@@ -44,19 +44,6 @@ sub version {
         "This is free software: You are free to change and redistribute it.\n");
     exit 0;
 }
-
-# sub read_file {
-#     my ($file) = @_;
-#     open(my $in, '<', $file) or die "Cannot open file '$file' for reading\n";
-#     return wantarray ? <$in> : join('', <$in>);
-# }
-
-# sub write_file {
-#     my ($file, $data, $fh) = @_;
-#     open($fh, '>', $file) or die "Cannot open file '$file' for writing: $!\n";
-#     print $fh $data;
-#     close($fh) or die "Cannot close file '$file' after writing: $!\n";
-# }
 
 # Usage: create_tempdir()
 #
@@ -146,7 +133,6 @@ sub start_server {
 
 sub server_main {
     my ($listenfh, $listenfile) = @_;
-    my ($program_name) = __FILE__ =~ m#([^/]*$)#;
     my $sockets = IO::Select->new($listenfh);  # wait for input on sockets
     while (my @ready = $sockets->can_read) {
         foreach my $fh (@ready) {              #   for each input
@@ -156,8 +142,9 @@ sub server_main {
                     $clientfh->autoflush(1);
                     $sockets->add($clientfh);
                     my $fn = fileno($clientfh);
+                    my ($program) = __FILE__ =~ m#([^/]*$)#;
                     print "(client $fn connected)\n";
-                    printf $clientfh "OK $program_name $VERSION $listenfile\n";
+                    print $clientfh "OK $program $VERSION $listenfile\n";
                 }
                 next;
             }
@@ -189,14 +176,14 @@ $SIG{__DIE__} = sub {
         ? '' : "Try '$name --help' for more information.\n");
 };
 
-my @file;
+my @arg;
 while (@ARGV) {
     local $_ = shift(@ARGV);
-    /^--$/ and do { push(@file, @ARGV); last };
+    /^--$/ and do { push(@arg, @ARGV); last };
     /^(-h|--help)$/ and help();
     /^(-V|--version)$/ and version();
     /^-./ and die "Unrecognized option '$_'\n";
-    push(@file, $_);
+    push(@arg, $_);
 }
 
 # Connect to server.
@@ -215,11 +202,11 @@ if ($sockets->can_read) {
 }
 
 # Send command(s) to server.
-if (@file) {
+if (@arg) {
     my $cwd = POSIX::getcwd();
-    for my $file (@file) {
+    for my $arg (@arg) {
         if ($sockets->can_write) {
-            print $server "load '$cwd/$file'\n";
+            print $server "load '$cwd/$arg'\n";
         }
         if ($sockets->can_read) {
             defined(my $reply = <$server>)
@@ -235,10 +222,10 @@ print $greeting;
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
-        defined(my $x = <$fh>) or exit;    # ^D from STDIN = exit
-        if ($fh == $server) {              # from server -> write to STDOUT
+        defined(my $x = <$fh>) or exit;        # ^D from STDIN = exit
+        if ($fh == $server) {                  # from server -> write to STDOUT
             print $x;
-        } else {                           # from STDIN -> write to server
+        } else {                               # from STDIN -> write to server
             print $server $x;
         }
     }
