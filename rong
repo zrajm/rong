@@ -16,8 +16,8 @@ use IO::Select;
 use POSIX;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.17';                         # https://semver.org/
-our $VERSION_DATE='10 January 2024';
+our $VERSION='0.0.18';                         # https://semver.org/
+our $VERSION_DATE='12 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [FILE]...
@@ -163,15 +163,18 @@ sub start_server {
         close($fh) or die "Cannot save file: $!\n";
     }
 
-
     my %buf;
-    my %opt = (pwd => Cwd::cwd());
+    my $dir = Cwd::cwd();
+    my %opt; # $opt{$id}{$property} where '$id' is a client connection id.
     my %cmd;
 
     sub abspath {
-        my $file = Cwd::abs_path(File::Spec->catfile($opt{pwd}, shift))
-            or die "Cannot resolve absolute path: $!";
-        return $file;
+        my ($path, $base) = @_;
+        if ($path !~ m#^/#) {
+            $path = Cwd::abs_path(File::Spec->catfile($base, $path))
+                or die "Cannot resolve absolute path: $!";
+        }
+        return $path;
     }
 
     sub relpath {
@@ -183,38 +186,49 @@ sub start_server {
     # error message.
     %cmd = (
         cat => sub {
-            my $file = abspath(shift);
+            my ($id, $file) = @_;
+            $file = abspath($file, $opt{$id}{pwd});
             die "File not loaded\n" if not exists $buf{$file};
             print @{$buf{$file}};
         },
         cd => sub {
-            my ($dir) = @_;
-            # Evaluate new pwd, die() if not cd:able.
-            say $opt{pwd} = $dir // $opt{pwd};
+            my ($id, $dir) = @_;
+            if (defined $dir) {
+                my $newdir = abspath($dir, $opt{$id}{pwd});
+                die "Directory does not exist\n" unless -d $newdir;
+                $opt{$id}{pwd} = $newdir;
+            }
+            say $opt{$id}{pwd};
         },
         help => sub {
+            my ($id, @arg) = @_;
+            die "No args allowed\n" if @arg;
             say join(' ', sort keys %cmd);
         },
         kill => sub {
-            my $file = abspath(shift);
+            my ($id, $file) = @_;
+            $file = abspath($file, $opt{$id}{pwd});
             die "File not loaded\n" if not exists $buf{$file};
             delete $buf{$file};
         },
         list => sub {
-            die "No args allowed\n" if @_;
+            my ($id, @arg) = @_;
+            die "No args allowed\n" if @arg;
             say join("\n", map {
-                escape(relpath($_, $opt{pwd}));
+                escape(relpath($_, $opt{$id}{pwd}));
             } sort keys(%buf));
         },
         load => sub {
-            my $file = abspath(shift);
+            my ($id, $file) = @_;
+            $file = abspath($file, $opt{$id}{pwd});
             die "File already loaded\n" if exists $buf{$file};
             $buf{$file} = load_file($file);
         },
         save => sub {
-            my $file = abspath(shift);
+            my ($id, $file) = @_;
+            $file = abspath($file, $opt{$id}{pwd});
             die "File not loaded\n" if not exists $buf{$file};
-            save_file("$opt{pwd}/$file", $buf{$file});
+            save_file("$opt{$id}{pwd}/$file", $buf{$file});
         },
     );
 
@@ -243,11 +257,26 @@ sub start_server {
         return map { unescape($_) } @x;
     }
 
+    sub initialize {
+        my ($id, $listenfile) = (@_);
+        my ($program) = __FILE__ =~ m#([^/]*$)#;
+        $opt{$id} = { pwd => $dir };
+        warn "(client $id connected, path '$opt{$id}{pwd}')\n";
+        say "OK $program $VERSION $listenfile";
+    }
+
+    sub terminate {
+        my ($id) = (@_);
+        warn "(client $id disconnected, path '$opt{$id}{pwd}')\n";
+        delete $opt{$id};
+    }
+
     # Result should always end in one line starting with 'OK' or 'ERR'.
     sub invoke {
-        my ($line) = @_;
+        my ($id, $line) = @_;
+        warn "(client $id sent, path '$opt{$id}{pwd}'): $line\n"; # received input
         my ($cmd, @arg) = deserialize($line);
-        eval { exists($cmd{$cmd}) ? $cmd{$cmd}(@arg) : undef } // do {
+        eval { exists($cmd{$cmd}) ? $cmd{$cmd}($id, @arg) : undef } // do {
             chomp(my $err = $@ || "Unrecognized command");
             say "ERR $err";
             return ();
@@ -267,24 +296,21 @@ sub server_main {
                 if ($clientfh) {
                     $clientfh->autoflush(1);
                     $sockets->add($clientfh);
-                    my $fn = fileno($clientfh);
-                    my ($program) = __FILE__ =~ m#([^/]*$)#;
-                    warn "(client $fn connected)\n";
-                    say $clientfh "OK $program $VERSION $listenfile";
+                    select($clientfh);
+                    rong::initialize(fileno($clientfh), $listenfile);
                 }
                 next;
             }
             my $fn = fileno($fh);
             defined(my $line = <$fh>) or do {  #      client disconnected
-                warn "(client $fn disconnected)\n";
+                rong::terminate($fn);
                 $sockets->remove($fh);
                 $fh->close;
                 next;
             };
             chomp $line;
-            warn "(client $fn sent): $line\n"; # received input
             select($fh);
-            rong::invoke($line);
+            rong::invoke($fn, $line);
         }
     }
 }

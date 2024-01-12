@@ -257,7 +257,7 @@
    CLOSED: [2024-01-10 Wed 01:04]
 ** DONE `rong cat FILE`
    CLOSED: [2024-01-10 Wed 01:08]
-* TODO `rong cd DIR` & relative filenames
+* [2/11] `rong cd DIR` & relative filenames
   Relative filenames should be used everywhere. Hmm? Should we use the clients
   path as base? Should filtering based on client's path be used instead of
   something session-y as well?
@@ -265,9 +265,28 @@
   File::Spec is a core module. Use that!
 ** DONE Use absolute paths internally
    CLOSED: [2024-01-10 Wed 19:29]
+** DONE Connection specific options
+   CLOSED: [2024-01-12 Fri 19:25]
+   These are some config specific to a client-server connection. They are
+   initialized when the client connects to the server, and forgotten again when
+   a client disconnects. The only setting right now is the current directory of
+   the client.
+
+   In interactive mode the user is now able to `cd` somewhere, then have the
+   `list` of files be relative to that current directory.
+** TODO Client should always send `cd` command when connecting
+   For single commands, issue a `cd $PWD` command before invoking the
+   user-requested command(s).
 ** TODO Handle paths better
+   The client cannot just always send full paths as args for each command (this
+   would make REPL-mode unpleasant to use).
+
    How to do this? Deal with it on the client side? Or have client send it's
    current directory to the server as it is connecting?
+** TODO Better client session ID
+   Client session ID should be unique even across multiple sockets (for when we
+   start doing that).
+** TODO Handle `~[username]` directories
 ** TODO `load FILE`
 ** TODO `list`
 ** TODO `kill FILE`
@@ -303,4 +322,17 @@
     saved again. (Instead a message should be given to the user.)
 * TODO Escaping should use same schema as shell or 'ls' command
   To make it make when using `rong list`.
+* [0/1] TESTS
+** TODO Resolving absolute paths
+   Then resolving any `/../` parts of a path, there's a corner case involving
+   symlinks that needs to be considered. Here a description from the manpage
+   File::Spec(3perl)
+
+       Note that this does *not* collapse `x/../y` sections into `y`. This is
+       by design. If `/foo` on your system is a symlink to `/bar/baz`, then
+       `/foo/../quux` is actually `/bar/quux`, not `/quux` as a naive
+       `../`-removal would give you. If you want to do this kind of processing,
+       you probably want "Cwd"'s "realpath()" function to actually traverse the
+       filesystem cleaning up paths like this.
+ 
 * [eof]
