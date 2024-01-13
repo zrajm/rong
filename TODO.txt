@@ -257,7 +257,10 @@
    CLOSED: [2024-01-10 Wed 01:04]
 ** DONE `rong cat FILE`
    CLOSED: [2024-01-10 Wed 01:08]
-* [2/11] `rong cd DIR` & relative filenames
+* [8/11] `rong cd DIR` & relative filenames
+  :PROPERTIES:
+  :COOKIE_DATA: todo recursive
+  :END:
   Relative filenames should be used everywhere. Hmm? Should we use the clients
   path as base? Should filtering based on client's path be used instead of
   something session-y as well?
@@ -265,6 +268,17 @@
   File::Spec is a core module. Use that!
 ** DONE Use absolute paths internally
    CLOSED: [2024-01-10 Wed 19:29]
+*** DONE Handle paths better
+    The client cannot just always send full paths as args for each command (this
+    would make REPL-mode unpleasant to use).
+
+    How to do this? Deal with it on the client side? Or have client send it's
+    current directory to the server as it is connecting?
+*** DONE `load FILE`
+*** DONE `list`
+*** DONE `kill FILE`
+*** DONE `save FILE`
+*** DONE `cat FILE`
 ** DONE Connection specific options
    CLOSED: [2024-01-12 Fri 19:25]
    These are some config specific to a client-server connection. They are
@@ -274,24 +288,19 @@
 
    In interactive mode the user is now able to `cd` somewhere, then have the
    `list` of files be relative to that current directory.
+** WONT Better client session ID
+   Not really needed, I think? `fileno()` should result in a unique number for
+   each open file in the server, regardless of filename. The only benefit of
+   using something more elaborate would be a lessened risk of accidentally
+   sharing info with the next client to connect (which could happen if the
+   previous connection failed to do its cleanup).
+
+   Client session ID should be unique even across multiple sockets (for when we
+   start doing that).
 ** TODO Client should always send `cd` command when connecting
    For single commands, issue a `cd $PWD` command before invoking the
    user-requested command(s).
-** TODO Handle paths better
-   The client cannot just always send full paths as args for each command (this
-   would make REPL-mode unpleasant to use).
-
-   How to do this? Deal with it on the client side? Or have client send it's
-   current directory to the server as it is connecting?
-** TODO Better client session ID
-   Client session ID should be unique even across multiple sockets (for when we
-   start doing that).
 ** TODO Handle `~[username]` directories
-** TODO `load FILE`
-** TODO `list`
-** TODO `kill FILE`
-** TODO `save FILE`
-** TODO `cat FILE`
 * [0/9] Improve subcommands
 ** TODO Subcommand functions should not be in hash
 ** TODO `rong` (without args) should start server + list buffers
