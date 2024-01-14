@@ -14,10 +14,11 @@ use charnames qw(:full :short);  # unneeded in v5.16
 use IO::Socket;
 use IO::Select;
 use POSIX;
+use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.18';                         # https://semver.org/
-our $VERSION_DATE='12 January 2024';
+our $VERSION='0.0.19';                         # https://semver.org/
+our $VERSION_DATE='14 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [FILE]...
@@ -144,7 +145,6 @@ sub start_server {
 {
     package rong;
     use File::Spec;
-    use Cwd;
 
     sub load_file {
         my ($file) = @_;
@@ -164,7 +164,6 @@ sub start_server {
     }
 
     my %buf;
-    my $dir = Cwd::cwd();
     my %opt; # $opt{$id}{$property} where '$id' is a client connection id.
     my %cmd;
 
@@ -260,7 +259,7 @@ sub start_server {
     sub initialize {
         my ($id, $listenfile) = (@_);
         my ($program) = __FILE__ =~ m#([^/]*$)#;
-        $opt{$id} = { pwd => $dir };
+        $opt{$id} = { pwd => '/' };
         warn "(client $id connected, path '$opt{$id}{pwd}')\n";
         say "OK $program $VERSION $listenfile";
     }
@@ -315,6 +314,34 @@ sub server_main {
     }
 }
 
+# For client sending a command to server, outputting reply.
+sub send_command {
+    my ($fh, $cmd, @arg) = @_;
+    my $sockets = IO::Select->new($fh);
+
+    # Send command.
+    my $full_cmd = rong::serialize($cmd, @arg);
+    if ($sockets->can_write) {
+        say $fh $full_cmd;
+    }
+
+    # Read server response.
+    if ($sockets->can_read) {
+        defined($fh->recv(my $reply, 1024*1024))
+            or die "Cannot read server response: $IO::Socket::errstr\n";
+        chomp $reply;
+        $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m; chomp($reply);
+        my ($status, $msg) = ($1, $2);
+        if ($status eq 'OK') {
+            say $reply if $reply;
+        } elsif ($status eq 'ERR') {
+            say "$full_cmd: $msg";
+        } else {
+            say "$full_cmd: Unknown server response: $reply";
+        }
+    }
+}
+
 ###############################################################################
 # Main
 
@@ -354,32 +381,18 @@ if ($sockets->can_read) {
         unless $greeting =~ /^OK rong \d+\.\d+\.\d+ \Q$socket\E$/;
 }
 
+# FIXME: Suppress output of this command.
+send_command($server, 'cd', Cwd::cwd());
+
 # Send command(s) to server.
 if (@arg) {
     # 1st command line arg is command (if recognized) otherwise use 'load'.
     my $cmd = ($arg[0] =~ /^(?:@{[ join('|', rong::subcommands) ]})$/)
         ? shift(@arg) : 'load';
 
+    # Repeat command for each arg (but send one command if no args).
     for my $arg (@arg ? @arg : undef) {
-        my $full_cmd = rong::serialize($cmd, $arg // ());
-        if ($sockets->can_write) {
-            say $server $full_cmd;
-        }
-        if ($sockets->can_read) {
-            defined($server->recv(my $reply, 1024*1024))
-                or die "Cannot read server response: $IO::Socket::errstr\n";
-            chomp $reply;
-            $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m; chomp($reply);
-            my ($status, $msg) = ($1, $2);
-            if ($status eq 'OK') {
-                say $reply if $reply;
-                #say "$status $msg";
-            } elsif ($status eq 'ERR') {
-                say "$full_cmd: $msg";
-            } else {
-                say "$full_cmd: Unknown server response: $reply";
-            }
-        }
+        send_command($server, $cmd, $arg // ());
     }
     exit 0;
 }

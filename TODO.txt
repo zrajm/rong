@@ -257,7 +257,7 @@
    CLOSED: [2024-01-10 Wed 01:04]
 ** DONE `rong cat FILE`
    CLOSED: [2024-01-10 Wed 01:08]
-* [8/11] `rong cd DIR` & relative filenames
+* [10/12] `rong cd DIR` & relative filenames
   :PROPERTIES:
   :COOKIE_DATA: todo recursive
   :END:
@@ -297,11 +297,15 @@
 
    Client session ID should be unique even across multiple sockets (for when we
    start doing that).
-** TODO Client should always send `cd` command when connecting
+** [1/2] Client should always send `cd` command when connecting
    For single commands, issue a `cd $PWD` command before invoking the
    user-requested command(s).
+*** DONE Always send initial `cd` from client
+    CLOSED: [2024-01-14 Sun 00:03]
+*** TODO Suppress output from initial `cd` command
 ** TODO Handle `~[username]` directories
-* [0/9] Improve subcommands
+* TODO create_tmpdir() should use File::Spec->tmpdir()
+* [0/10] Improve subcommands
 ** TODO Subcommand functions should not be in hash
 ** TODO `rong` (without args) should start server + list buffers
    This should start the daemon process and then immediately exist the client.
@@ -313,6 +317,9 @@
 ** TODO `rong repl`
    There should be a user greeting, with listing of commands also telling that
    ^C or ^D exists.
+** TODO `rong cd` should allow symlink(s) in path
+   When `foo` is symlink to `bar/baz` then cd `foo` should set the current dir
+   to `foo` (NOT `bar/baz`)
 ** TODO `rong load` -- Handle read errors
    Should any catch any errors gotten while reading (in `<$fh>` statement) too.
 ** TODO `rong save` -- Handle write errors
