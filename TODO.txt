@@ -331,8 +331,9 @@
   CLOSED: [2024-01-17 Wed 05:09]
   Loading a file with a path like `foo/../lala` should result in the loaded
   file having a name which does not include the `..` component.
-* TODO `rong list` when current dir is unknown -- use absolute paths
-  When path is '/' or undef, display absolute paths.
+* DONE `rong list` when current dir is root -- use absolute paths
+  CLOSED: [2024-01-17 Wed 05:23]
+  When path is '/', display absolute paths.
 * TODO Server should log when it starts
 * TODO Server should log when it exits/dies
   An `END` block inside the Rong package, should work. But it doesn't fire on

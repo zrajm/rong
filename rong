@@ -17,7 +17,7 @@ use POSIX;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.23';                         # https://semver.org/
+our $VERSION='0.0.24';                         # https://semver.org/
 our $VERSION_DATE='17 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -178,7 +178,7 @@ sub start_server {
 
     sub relpath {
         my ($path, $base) = @_;
-        return File::Spec->abs2rel($path, $base);
+        return $base eq '/' ? $path : File::Spec->abs2rel($path, $base);
     }
 
     # Here say() & print() goes to client; warn() goes to log; die() exits with
