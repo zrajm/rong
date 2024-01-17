@@ -17,7 +17,7 @@ use POSIX;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.21';                         # https://semver.org/
+our $VERSION='0.0.22';                         # https://semver.org/
 our $VERSION_DATE='17 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -45,12 +45,12 @@ USAGE_END
 
 sub help { print $USAGE; exit 0; }
 sub version {
-    (my $file     = __FILE__     ) =~ s#^.*/##;
-    (my $years    = $CREATED_DATE) =~ s#^.* ##;
-    (my $end_year = $VERSION_DATE) =~ s#^.* ##;
-    if ($years ne $end_year) { $years .= "-$end_year" }
+    my ($program)  = __FILE__      =~ m#([^/]*$)#;
+    my ($years)    = $CREATED_DATE =~ m#(\d{4})#;
+    my ($end_year) = $VERSION_DATE =~ m#(\d{4})#;
+    $years .= "-$end_year" unless $years eq $end_year;
     print(
-        "$file (zrajm utils) $VERSION ($VERSION_DATE)\n",
+        "$program (zrajm utils) $VERSION ($VERSION_DATE)\n",
         "Copyright (C) $years $AUTHOR\n",
         "License: GNU GPLv2 <https://gnu.org/licenses/gpl-2.0.txt>.\n",
         "This is free software: You are free to change and redistribute it.\n");
@@ -352,10 +352,10 @@ my $socket = "$tempdir/default";
 my $logfile = "$socket.log";
 
 $SIG{__DIE__} = sub {
-    my ($name) = $0 =~ m#([^/]*$)#;
+    my ($program) = __FILE__ =~ m#([^/]*$)#;
     # When not called from function, add extra help.
-    die("$name: @_", defined(caller(1))
-        ? '' : "Try '$name --help' for more information.\n");
+    die("$program: @_", defined(caller(1))
+        ? '' : "Try '$program --help' for more information.\n");
 };
 
 my @arg;
