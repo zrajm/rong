@@ -334,8 +334,10 @@
 * DONE `rong list` when current dir is root -- use absolute paths
   CLOSED: [2024-01-17 Wed 05:23]
   When path is '/', display absolute paths.
-* TODO Server should log when it starts
-* TODO Server should log when it exits/dies
+* DONE Server should log when it starts
+  CLOSED: [2024-01-17 Wed 21:33]
+* DONE Server should log when it exits/dies
+  CLOSED: [2024-01-17 Wed 21:33]
   An `END` block inside the Rong package, should work. But it doesn't fire on
   SIGINT (unless there's a trap, possibly?).
 
