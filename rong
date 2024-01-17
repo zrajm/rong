@@ -17,7 +17,7 @@ use POSIX;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.24';                         # https://semver.org/
+our $VERSION='0.0.25';                         # https://semver.org/
 our $VERSION_DATE='17 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -148,6 +148,11 @@ sub start_server {
 
     sub load_file {
         my ($file) = @_;
+        die "Cannot load file: Is a directory\n" if -d $file;
+        die "Cannot load file: Is a block device\n" if -b _;
+        die "Cannot load file: Is a character device\n" if -c _;
+        die "Cannot load file: Is a named pipe\n" if -p _;
+        die "Cannot load file: Is a socket\n" if -S _;
         open(my $fh, '<', $file) or die "Cannot load file: $!\n";
         # FIXME: catch errors in <$fh> too
         my @buf = <$fh>;

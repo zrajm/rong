@@ -356,7 +356,7 @@
   This will happen if the current directory doesn't exist when starting rong.
 * TODO Empty arg to escape() should return ""
 * TODO Command to check if server is running (without starting it)
-* [0/12] Improve subcommands
+* [1/13] Improve subcommands
 ** TODO Subcommand functions should not be in hash
 ** TODO `rong` (without args) should start server + list buffers
    This should start the daemon process and then immediately exist the client.
@@ -371,6 +371,10 @@
 ** TODO `rong cd` should allow symlink(s) in path
    When `foo` is symlink to `bar/baz` then cd `foo` should set the current dir
    to `foo` (NOT `bar/baz`)
+** DONE `rong load` -- Give error in case of non-files & follow symlinks
+   CLOSED: [2024-01-17 Wed 18:50]
+   `abspath()` already resolved any symlinks in filename. Added errors for
+   fifo, device files etc.
 ** TODO `rong load` -- Handle read errors
    Should any catch any errors gotten while reading (in `<$fh>` statement) too.
 ** TODO `rong save` -- Handle write errors
