@@ -266,7 +266,7 @@
    CLOSED: [2024-01-10 Wed 01:04]
 ** DONE `rong cat FILE`
    CLOSED: [2024-01-10 Wed 01:08]
-* [12/13] `rong cd DIR` & relative filenames
+* [13/13] `rong cd DIR` & relative filenames
   :PROPERTIES:
   :COOKIE_DATA: todo recursive
   :END:
@@ -323,19 +323,33 @@
    Also, using `Cwd::cwd()` does not resolve uniquely (since symlinks in the
    path are not resolved). So therefore, use `Cwd::getcwd()` (which does
    resolve all symlinks) instead.
-** TODO Handle `~[username]` directories
+** DONE Handle `~[username]` directories
+   CLOSED: [2024-01-17 Wed 05:09]
 * DONE `rong list` with no files loaded shouldn't display blank line
   CLOSED: [2024-01-17 Wed 03:26]
+* DONE Fix `abspath()`
+  CLOSED: [2024-01-17 Wed 05:09]
+  Loading a file with a path like `foo/../lala` should result in the loaded
+  file having a name which does not include the `..` component.
 * TODO `rong list` when current dir is unknown -- use absolute paths
   When path is '/' or undef, display absolute paths.
 * TODO Server should log when it starts
 * TODO Server should log when it exits/dies
-* TODO Fix `abspath()`
-  Loading a file with a path like `foo/../lala` should result in the loaded
-  file having a name which does not include the `..` component.
+  An `END` block inside the Rong package, should work. But it doesn't fire on
+  SIGINT (unless there's a trap, possibly?).
+
+      END { warn "(server exited)\n" unless -t STDERR }
+
 * TODO `rong list` option to display absolute paths
 * TODO Client should die (immediately) if server dies
   Maybe temporarily add a die command to test this on the server side?
+
+  If not doing `chomp($x)` after reading STDIN in REPL-mode, and calling
+  `deserialize()` before the `eval { }` in `invoke()` the first command in
+  REPL-mode will work, but the second will crash the server.
+
+  Is using $fh->connected to verify that we're still connected the way to do
+  it?
 * TODO create_tmpdir() should use File::Spec->tmpdir()
 * TODO Make sure error message is intelligible if initial `cd` fails
   This will happen if the current directory doesn't exist when starting rong.

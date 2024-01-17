@@ -17,7 +17,7 @@ use POSIX;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.22';                         # https://semver.org/
+our $VERSION='0.0.23';                         # https://semver.org/
 our $VERSION_DATE='17 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -169,10 +169,10 @@ sub start_server {
 
     sub abspath {
         my ($path, $base) = @_;
-        if ($path !~ m#^/#) {
-            $path = Cwd::abs_path(File::Spec->catfile($base, $path))
-                or die "Cannot resolve absolute path: $!";
-        }
+        $path =~ s#^~([^/]*)# (getpwnam($1 || (getpwuid($<))[0]))[7] #e;
+        $path = File::Spec->join($base, $path)
+            unless File::Spec->file_name_is_absolute($path);
+        $path = Cwd::realpath($path) or die "Cannot resolve absolute path: $!";
         return $path;
     }
 
