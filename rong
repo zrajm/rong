@@ -17,8 +17,8 @@ use POSIX;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.19';                         # https://semver.org/
-our $VERSION_DATE='14 January 2024';
+our $VERSION='0.0.20';                         # https://semver.org/
+our $VERSION_DATE='17 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [FILE]...
@@ -274,8 +274,10 @@ sub start_server {
     sub invoke {
         my ($id, $line) = @_;
         warn "(client $id sent, path '$opt{$id}{pwd}'): $line\n"; # received input
-        my ($cmd, @arg) = deserialize($line);
-        eval { exists($cmd{$cmd}) ? $cmd{$cmd}($id, @arg) : undef } // do {
+        eval {
+            my ($cmd, @arg) = deserialize($line);
+            exists($cmd{$cmd}) ? $cmd{$cmd}($id, @arg) : undef;
+        } // do {
             chomp(my $err = $@ || "Unrecognized command");
             say "ERR $err";
             return ();
@@ -314,32 +316,32 @@ sub server_main {
     }
 }
 
-# For client sending a command to server, outputting reply.
-sub send_command {
-    my ($fh, $cmd, @arg) = @_;
+# Send $cmdstring to server $fh, setting $reply to the response gotten from
+# server. Returns true if server returned an 'OK' response, false otherwise (in
+# which case $reply is set to `undef` and $@ is set to an error message).
+sub send_command(\$$$) {
+    my ($reply, $fh, $cmdstr) = @_;
     my $sockets = IO::Select->new($fh);
 
     # Send command.
-    my $full_cmd = rong::serialize($cmd, @arg);
     if ($sockets->can_write) {
-        say $fh $full_cmd;
+        say $fh $cmdstr;
     }
 
     # Read server response.
     if ($sockets->can_read) {
-        defined($fh->recv(my $reply, 1024*1024))
-            or die "Cannot read server response: $IO::Socket::errstr\n";
-        chomp $reply;
-        $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m; chomp($reply);
-        my ($status, $msg) = ($1, $2);
-        if ($status eq 'OK') {
-            say $reply if $reply;
-        } elsif ($status eq 'ERR') {
-            say "$full_cmd: $msg";
-        } else {
-            say "$full_cmd: Unknown server response: $reply";
-        }
+        $$reply = eval {
+            local $SIG{__DIE__} = 'DEFAULT';
+            $fh->recv(my $reply, 1024*1024) // die "Cannot read server response\n";
+            chomp($reply);
+            $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m;
+            my ($status, $msg) = ($1 // '', $2);
+            die "$msg\n" if $status eq 'ERR';
+            die "Unknown server response: $reply\n" unless $status eq 'OK';
+            $reply;
+        };
     }
+    return not $@;
 }
 
 ###############################################################################
@@ -381,8 +383,8 @@ if ($sockets->can_read) {
         unless $greeting =~ /^OK rong \d+\.\d+\.\d+ \Q$socket\E$/;
 }
 
-# FIXME: Suppress output of this command.
-send_command($server, 'cd', Cwd::cwd());
+send_command(my $result, $server, rong::serialize('cd', Cwd::getcwd() // '/'))
+    or warn "Cannot change dir: $@";
 
 # Send command(s) to server.
 if (@arg) {
@@ -392,7 +394,13 @@ if (@arg) {
 
     # Repeat command for each arg (but send one command if no args).
     for my $arg (@arg ? @arg : undef) {
-        send_command($server, $cmd, $arg // ());
+        my $cmdstr = rong::serialize($cmd, $arg // ());
+        if (send_command(my $result, $server, $cmdstr)) {
+            print $result;
+        } else {
+            my ($program) = __FILE__ =~ m#([^/]*$)#;
+            warn "$program $cmdstr: $@";
+        }
     }
     exit 0;
 }
@@ -403,12 +411,18 @@ $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
         if ($fh == $server) {                  # from server -> write to STDOUT
-            defined($fh->recv(my $x, 1024*1024))
-                or die "Cannot read from daemon: $IO::Socket::errstr\n";
-            print $x;
+            $fh->recv(my $x, 1024*1024) // die "Cannot read server response\n";
+            chomp($x);
+            say $x;
         } else {                               # from STDIN -> write to server
             defined(my $x = <$fh>) or exit;    # ^D from STDIN = exit
-            print $server $x;
+            chomp($x);
+            if (send_command(my $result, $server, $x)) {
+                print $result;
+                say "OK";
+            } else {
+                print "ERR $@";
+            }
         }
     }
 }

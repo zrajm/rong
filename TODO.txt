@@ -6,6 +6,15 @@
    + Server starts when client connect, sends `OK rong <VERSION> <SOCKET>`
    + All server responses is single line, starting with 'OK' or 'ERR'
 ** TODO Use sysread for sockets?
+   See also: https://stackoverflow.com/a/5600853/351162 (diff <>, sysread, rect)
+   Raw fileread: https://www.perlmonks.org/?node_id=1195588
+
+   On nonblocking sockets and ->connected():
+   https://www.ralph-schuster.eu/2015/06/19/nonblocking-sockets-and-perls-netdaemon/
+
+   Webserver with Perl:
+   https://redirect.cs.umbc.edu/courses/331/fall12/notes/perl/aWebserverWithPerl.html
+
    Switched to using recv() for the sockets, but it'd be nicer to use something
    that can be used on both STDIN and socket, to simplify the client REPL-loop.
 
@@ -257,7 +266,7 @@
    CLOSED: [2024-01-10 Wed 01:04]
 ** DONE `rong cat FILE`
    CLOSED: [2024-01-10 Wed 01:08]
-* [10/12] `rong cd DIR` & relative filenames
+* [12/13] `rong cd DIR` & relative filenames
   :PROPERTIES:
   :COOKIE_DATA: todo recursive
   :END:
@@ -297,15 +306,41 @@
 
    Client session ID should be unique even across multiple sockets (for when we
    start doing that).
-** [1/2] Client should always send `cd` command when connecting
+** [2/2] Client should always send `cd` command when connecting
    For single commands, issue a `cd $PWD` command before invoking the
    user-requested command(s).
 *** DONE Always send initial `cd` from client
     CLOSED: [2024-01-14 Sun 00:03]
-*** TODO Suppress output from initial `cd` command
+*** DONE Suppress output from initial `cd` command
+    CLOSED: [2024-01-14 Sun 02:40]
+** DONE Use `Cwd::getcwd()` instead of `Cwd:cwd()`
+   CLOSED: [2024-01-16 Tue 18:34]
+   `Cwd:cwd()` gives a weird error message when invoked from inside a
+   non-existing directory:
+
+      /bin/pwd: couldn't find directory entry in ‘..’ with matching i-node
+
+   Also, using `Cwd::cwd()` does not resolve uniquely (since symlinks in the
+   path are not resolved). So therefore, use `Cwd::getcwd()` (which does
+   resolve all symlinks) instead.
 ** TODO Handle `~[username]` directories
+* TODO `rong list` with no files loaded shouldn't display blank line
+* TODO `rong list` when current dir is unknown -- use absolute paths
+  When path is '/' or undef, display absolute paths.
+* TODO Server should log when it starts
+* TODO Server should log when it exits/dies
+* TODO Fix `abspath()`
+  Loading a file with a path like `foo/../lala` should result in the loaded
+  file having a name which does not include the `..` component.
+* TODO `rong list` option to display absolute paths
+* TODO Client should die (immediately) if server dies
+  Maybe temporarily add a die command to test this on the server side?
 * TODO create_tmpdir() should use File::Spec->tmpdir()
-* [0/10] Improve subcommands
+* TODO Make sure error message is intelligible if initial `cd` fails
+  This will happen if the current directory doesn't exist when starting rong.
+* TODO Empty arg to escape() should return ""
+* TODO Command to check if server is running (without starting it)
+* [0/12] Improve subcommands
 ** TODO Subcommand functions should not be in hash
 ** TODO `rong` (without args) should start server + list buffers
    This should start the daemon process and then immediately exist the client.
@@ -325,8 +360,13 @@
 ** TODO `rong save` -- Handle write errors
    Should any catch errors gotten while writing (in `print` statement) too.
 ** TODO `rong save` -- Make atomic
+** TODO `rong cat` -- with no trailing newline
+   If the file doesn't end in a newline, then newline should be added. This
+   requires different schema for the OK/ERR message, as the OK/ERR no longer
+   will be at the end of the last line. How do other protocols handle this?
 ** TODO `rong mv`
 ** TODO `rong cp`
+** TODO Failing a command should result in non-zero exit status
 ** TODO File fingerprinting & checksumming
 *** TODO `rong load` -- Avoid useless reloads
     This should use fingerprinting, but do a checksum if fingerprint fails.
