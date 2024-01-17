@@ -17,7 +17,7 @@ use POSIX;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.20';                         # https://semver.org/
+our $VERSION='0.0.21';                         # https://semver.org/
 our $VERSION_DATE='17 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -213,9 +213,9 @@ sub start_server {
         list => sub {
             my ($id, @arg) = @_;
             die "No args allowed\n" if @arg;
-            say join("\n", map {
-                escape(relpath($_, $opt{$id}{pwd}));
-            } sort keys(%buf));
+            print map {
+                escape(relpath($_, $opt{$id}{pwd})) . "\n";
+            } sort keys(%buf);
         },
         load => sub {
             my ($id, $file) = @_;
