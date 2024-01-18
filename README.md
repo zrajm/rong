@@ -1,5 +1,7 @@
 # Rong
 
+Motto:
+
 > “Write in Rong” *or* “It’s Rong to be headless.”
 
 **This is in no way a functional editor (yet).**
@@ -9,12 +11,12 @@
 
 Rong is an daemonic headless text editor.
 
-It’s *Daemonic* because, when you first invoke Rong, a server process (also
+It’s *daemonic* because, when you first invoke Rong, a server process (also
 known as a *daemon* in Unix parlance) is started up in the background. This
-server then responsible for keeping your texts in memory, and is used to load,
-edit, and save them.
+server then responsible for keeping your texts in memory and perform all
+operations on them.
 
-It’s *Headless* because Rong doesn’t show you your text in a graphical (or even
+It’s *headless* because Rong doesn’t show the text in a graphical (or even
 terminal) window. Instead subcommands are used to load, manipulate, and save
 your texts. When you invoke Rong, it talks to the server, which changes the
 text for you.
