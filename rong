@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.27';                         # https://semver.org/
+our $VERSION='0.0.28';                         # https://semver.org/
 our $VERSION_DATE='18 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -180,10 +180,10 @@ sub start_server {
 
     sub abspath {
         my ($path, $base) = @_;
-        $path =~ s#^~([^/]*)# (getpwnam($1 || (getpwuid($<))[0]))[7] #e;
+        $path =~ s#^~[^/]*# glob("'$&'") #e;
         $path = File::Spec->join($base, $path)
             unless File::Spec->file_name_is_absolute($path);
-        $path = Cwd::realpath($path) or die "Cannot resolve absolute path: $!";
+        $path = Cwd::realpath($path) or die "$!\n";
         return $path;
     }
 
