@@ -214,6 +214,8 @@
   CLOSED: [2024-01-18 Thu 03:45]
 * DONE Use `File::Spec` for all file name manipulations
   CLOSED: [2024-01-18 Thu 04:11]
+* DONE Empty arg to `escape()` should return ""
+  CLOSED: [2024-01-18 Thu 22:22]
 * [1/11] Improve subcommands
 ** TODO Subcommand functions should not be in hash
 ** TODO `rong` (without args) should start server + list buffers
@@ -379,7 +381,6 @@
   it?
 * TODO Make sure error message is intelligible if initial `cd` fails
   This will happen if the current directory doesn't exist when starting rong.
-* TODO Empty arg to `escape()` should return ""
 * TODO Command to check if server is running (without starting it)
 * TODO Escaping should use same schema as shell or 'ls' command
   To make it make when using `rong list`.
