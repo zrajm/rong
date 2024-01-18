@@ -206,8 +206,15 @@
 
       END { warn "(server exited)\n" unless -t STDERR }
 
-* TODO `create_tmpdir()` should use `File::Spec->tmpdir()`
-* [1/13] Improve subcommands
+* DONE `create_tmpdir()` should use `File::Spec->tmpdir()`
+  CLOSED: [2024-01-18 Thu 02:55]
+* DONE Use `File::Spec->splitpath()` to get program name
+  CLOSED: [2024-01-18 Thu 03:26]
+* DONE Use `File::Spec->rootdir()`
+  CLOSED: [2024-01-18 Thu 03:45]
+* DONE Use `File::Spec` for all file name manipulations
+  CLOSED: [2024-01-18 Thu 04:11]
+* [1/11] Improve subcommands
 ** TODO Subcommand functions should not be in hash
 ** TODO `rong` (without args) should start server + list buffers
    This should start the daemon process and then immediately exist the client.
@@ -344,6 +351,7 @@
 * TODO Escaping should use same schema as shell or 'ls' command
   To make it make when using `rong list`.
 * [0/8] FAR-FLUNG FUTURE FEATURES
+** TODO If socket file is deleted, should server re-create it(?)
 ** TODO Use `shutdown()` to close socket?
    https://docstore.mik.ua/orelly/perl/cookbook/ch17_10.htm
 ** TODO On startup make sure any existing tempdir is chmod 0700

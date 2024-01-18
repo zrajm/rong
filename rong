@@ -14,11 +14,12 @@ use charnames qw(:full :short);  # unneeded in v5.16
 use IO::Socket;
 use IO::Select;
 use POSIX;
+use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.26';                         # https://semver.org/
-our $VERSION_DATE='17 January 2024';
+our $VERSION='0.0.27';                         # https://semver.org/
+our $VERSION_DATE='18 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [FILE]...
@@ -45,7 +46,7 @@ USAGE_END
 
 sub help { print $USAGE; exit 0; }
 sub version {
-    my ($program)  = __FILE__      =~ m#([^/]*$)#;
+    my $program    = (File::Spec->splitpath(__FILE__))[2];
     my ($years)    = $CREATED_DATE =~ m#(\d{4})#;
     my ($end_year) = $VERSION_DATE =~ m#(\d{4})#;
     $years .= "-$end_year" unless $years eq $end_year;
@@ -64,10 +65,8 @@ sub version {
 # parts can change depending on your $TEMPDIR variable, the name of the script
 # and your user's numerical user id). The directory name is the same as Tmux.
 sub create_tempdir {
-    my $dir = sprintf '%s/%s-%s',
-        ($ENV{TMPDIR} // '/tmp'),              # tempdir
-        (split('/', $0))[-1],                  # program's basename
-        $<;                                    # real user ID (number)
+    my $program = (File::Spec->splitpath(__FILE__))[2];
+    my $dir = File::Spec->join(File::Spec->tmpdir(), "$program-$<");
     mkdir($dir, 0700) or die "Cannot create tempdir '$dir': $!\n"
         unless -d $dir;
     return $dir;
@@ -124,8 +123,9 @@ sub start_server {
         defined(my $server_pid = fork) or die "Cannot fork server: $!\n";
         if ($server_pid == 0) {                # in server
             $0 .= ' --daemon';                 #   server process name
+            my $root = File::Spec->rootdir();
             umask(0) or die "Cannot change umask to '0': $!\n";
-            chdir('/') or die "Cannot change directory to '/': $!\n";
+            chdir($root) or die "Cannot change dir to '$root': $!\n";
             close STDOUT;
             open(STDERR, '>>', $logfile)
                 or die "Cannot open logfile '$logfile': $!\n";
@@ -144,7 +144,6 @@ sub start_server {
 
 {
     package rong;
-    use File::Spec;
     unless (-t STDERR) {
         use sigtrap qw/handler exithandler normal-signals/;
         sub exithandler {
@@ -190,7 +189,8 @@ sub start_server {
 
     sub relpath {
         my ($path, $base) = @_;
-        return $base eq '/' ? $path : File::Spec->abs2rel($path, $base);
+        return $base eq File::Spec->rootdir()
+            ? $path : File::Spec->abs2rel($path, $base);
     }
 
     # Here say() & print() goes to client; warn() goes to log; die() exits with
@@ -270,8 +270,8 @@ sub start_server {
 
     sub initialize {
         my ($id, $listenfile) = (@_);
-        my ($program) = __FILE__ =~ m#([^/]*$)#;
-        $opt{$id} = { pwd => '/' };
+        my $program = (File::Spec->splitpath(__FILE__))[2];
+        $opt{$id} = { pwd => File::Spec->rootdir() };
         warn "(client $id connected, path '$opt{$id}{pwd}')\n";
         say "OK $program $VERSION $listenfile";
     }
@@ -360,11 +360,11 @@ sub send_command(\$$$) {
 # Main
 
 my $tempdir = create_tempdir();
-my $socket = "$tempdir/default";
-my $logfile = "$socket.log";
+my $socket  = File::Spec->join($tempdir, "default");
+my $logfile = File::Spec->join($tempdir, "default.log");
 
 $SIG{__DIE__} = sub {
-    my ($program) = __FILE__ =~ m#([^/]*$)#;
+    my $program = (File::Spec->splitpath(__FILE__))[2];
     # When not called from function, add extra help.
     die("$program: @_", defined(caller(1))
         ? '' : "Try '$program --help' for more information.\n");
@@ -395,8 +395,9 @@ if ($sockets->can_read) {
         unless $greeting =~ /^OK rong \d+\.\d+\.\d+ \Q$socket\E$/;
 }
 
-send_command(my $result, $server, rong::serialize('cd', Cwd::getcwd() // '/'))
-    or warn "Cannot change dir: $@";
+send_command(my $result, $server, rong::serialize(
+    'cd', Cwd::getcwd() // File::Spec->rootdir()
+)) or warn "Cannot change dir: $@";
 
 # Send command(s) to server.
 if (@arg) {
@@ -410,7 +411,7 @@ if (@arg) {
         if (send_command(my $result, $server, $cmdstr)) {
             print $result;
         } else {
-            my ($program) = __FILE__ =~ m#([^/]*$)#;
+            my $program = (File::Spec->splitpath(__FILE__))[2];
             warn "$program $cmdstr: $@";
         }
     }
