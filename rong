@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.30';                         # https://semver.org/
+our $VERSION='0.0.31';                         # https://semver.org/
 our $VERSION_DATE='18 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -144,12 +144,14 @@ sub start_server {
 
 {
     package rong;
-
     use sigtrap qw/handler exithandler normal-signals/;
 
     sub exithandler {
         warn "(server exited)\n" unless -t STDERR;
     }
+
+    ###########################################################################
+    ## Internal functions, called inside eval, use die() to indicate error
 
     sub load_file {
         my ($file) = @_;
@@ -173,10 +175,6 @@ sub start_server {
         close($fh) or die "Cannot save file: $!\n";
     }
 
-    my %buf;
-    my %opt; # $opt{$id}{$property} where '$id' is a client connection id.
-    my %cmd;
-
     sub abspath {
         my ($path, $base) = @_;
         $path =~ s#^~[^/]*# glob("'$&'") #e;
@@ -194,6 +192,9 @@ sub start_server {
 
     # Here say() & print() goes to client; warn() goes to log; die() exits with
     # error message.
+    my %buf;
+    my %opt; # $opt{$id}{$property} where '$id' is a client connection id.
+    my %cmd;
     %cmd = (
         cat => sub {
             my ($id, $file) = @_;
@@ -242,14 +243,16 @@ sub start_server {
         },
     );
 
-    sub subcommands { keys(%cmd) }
-
-    sub escape {
+    # Note: escape() & serialize() are used externally (and must therefore not
+    # die()), while unescape() and deserialize() are not (and may die()).
+    sub deserialize {
         local ($_) = @_;
-        my %c = ("\a"=>'\a', "\b"=>'\b', "\e"=>'\e',  "\f"=>'\f', "\n"=>'\n',
-                 "\r"=>'\r', "\t"=>'\t', "\\"=>'\\\\','"' =>'\"', "'" =>"\\'");
-        return s# [[:cntrl:]\\"] # $c{$&} // sprintf('\\x%02X', ord $&) #gex
-            || /^$/ || / / ? "\"$_\"" : $_;    # if empty or has space/escape
+        my @x = m/\G( "(?:[^"\\]|\\.)*" |      # double quoted
+                      '(?:[^'\\]|\\.)*' |      # single quoted
+                      [^[:cntrl:][:space:]"']+ # other words
+                  )(?:\h+|$)/gxc;
+        die "Cannot deserialize string\n" if pos != length;
+        return map { unescape($_) } @x;
     }
     sub unescape {
         local ($_) = @_;
@@ -257,15 +260,17 @@ sub start_server {
         s#\\([abefnrt\\\"']|x[0-9A-F]{2})# eval "\"$&\"" #ge;
         return $_;
     }
+
+    ###########################################################################
+    ## Called externally, must not die()
+
     sub serialize { join ' ', map { escape($_) } @_ }
-    sub deserialize {
+    sub escape {
         local ($_) = @_;
-        my @x = m/\G( "(?:[^"\\]|\\.)*" |      # double quoted
-                      '(?:[^'\\]|\\.)*' |      # single quoted
-                      [^[:cntrl:][:space:]"']+# other words
-                  )(?:\h+|$)/gxc;
-        die "Cannot deserialize string\n" if pos != length;
-        return map { unescape($_) } @x;
+        my %c = ("\a"=>'\a', "\b"=>'\b', "\e"=>'\e',  "\f"=>'\f', "\n"=>'\n',
+                 "\r"=>'\r', "\t"=>'\t', "\\"=>'\\\\','"' =>'\"', "'" =>"\\'");
+        return s# [[:cntrl:]\\"] # $c{$&} // sprintf('\\x%02X', ord $&) #gex
+            || /^$/ || / / ? "\"$_\"" : $_;    # if empty or has space/escape
     }
 
     sub initialize {
@@ -281,6 +286,8 @@ sub start_server {
         warn "(client $id disconnected, path '$opt{$id}{pwd}')\n";
         delete $opt{$id};
     }
+
+    sub subcommands { keys(%cmd) }
 
     # Result should always end in one line starting with 'OK' or 'ERR'.
     sub invoke {
