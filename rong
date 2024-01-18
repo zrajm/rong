@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.28';                         # https://semver.org/
+our $VERSION='0.0.29';                         # https://semver.org/
 our $VERSION_DATE='18 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -144,12 +144,11 @@ sub start_server {
 
 {
     package rong;
-    unless (-t STDERR) {
-        use sigtrap qw/handler exithandler normal-signals/;
-        sub exithandler {
-            $SIG{__DIE__} = 'DEFAULT';
-            die "(server exited)\n";
-        }
+
+    use sigtrap qw/handler exithandler normal-signals/;
+
+    sub exithandler {
+        warn "(server exited)\n" unless -t STDERR;
     }
 
     sub load_file {
@@ -287,6 +286,7 @@ sub start_server {
         my ($id, $line) = @_;
         warn "(client $id sent, path '$opt{$id}{pwd}'): $line\n"; # received input
         eval {
+            local $SIG{__DIE__} = 'DEFAULT';
             my ($cmd, @arg) = deserialize($line);
             exists($cmd{$cmd}) ? $cmd{$cmd}($id, @arg) : undef;
         } // do {
@@ -363,7 +363,7 @@ my $tempdir = create_tempdir();
 my $socket  = File::Spec->join($tempdir, "default");
 my $logfile = File::Spec->join($tempdir, "default.log");
 
-$SIG{__DIE__} = sub {
+local $SIG{__DIE__} = sub {
     my $program = (File::Spec->splitpath(__FILE__))[2];
     # When not called from function, add extra help.
     die("$program: @_", defined(caller(1))

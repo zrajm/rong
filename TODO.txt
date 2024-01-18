@@ -205,7 +205,7 @@
   SIGINT (unless there's a trap, possibly?).
 
       END { warn "(server exited)\n" unless -t STDERR }
-
+ 
 * DONE `create_tmpdir()` should use `File::Spec->tmpdir()`
   CLOSED: [2024-01-18 Thu 02:55]
 * DONE Use `File::Spec->splitpath()` to get program name
@@ -298,6 +298,39 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
+* [1/4] Improve error messages & help
+** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
+   CLOSED: [2024-01-18 Thu 22:17]
+   Giving incorrect args to a command inserts 'rong:' twice in the error
+   output. Fix this:
+
+       $ rong list BLA
+       rong list BLA: rong: No args allowed
+
+   Was the result of a `$SIG{__DIE__}` hook being invoked inside an `eval { }`
+   block.
+** TODO Make error messages more user friendly
+  When invoking command from the command line, like so
+
+      $ rong list osuh
+      rong list osuh: No args allowed
+
+  The error message should more similar to when an incorrect option was given:
+
+      $ rong --osuhou
+      rong: Unrecognized option '--osuhou'
+      Try 'rong help' for more information.
+
+  Something more like this:
+
+      $ rong list osuh
+      rong list "osuh": No args allowed
+      Try 'rong help list' for more information.
+ 
+** TODO Fetch help info from server
+   The command information should be read from the server, so that the REPL
+   will show the same help info as the command line client.
+** TODO Option `--help` and command `help` give same output
 * TODO Accept standard server signals (SIGHUP, SIGINT etc)
   Resist SIGTERM! This is so that `pkill rong` kills client processes but not
   the server.
