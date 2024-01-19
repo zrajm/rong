@@ -478,7 +478,8 @@
        OK rong 0.0.42 /tmp/rong-100/default 0(exit halt help list cd) 1(cd
            cat kill load save) 2(mv cp)
  
-* [0/1] TESTS
+* [0/2] TESTS
+** TODO Use the modulino pattern to make program testable
 ** TODO Resolving absolute paths
    Then resolving any `/../` parts of a path, there's a corner case involving
    symlinks that needs to be considered. Here a description from the manpage

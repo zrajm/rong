@@ -18,12 +18,12 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.34';                         # https://semver.org/
+our $VERSION='0.0.35';                         # https://semver.org/
 our $VERSION_DATE='19 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
-Usage: rong [OPTION]... [FILE]...
-A daemonic headless editor.
+Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
+A daemonic headless text editor.
 
 Options:
   -h, --help      Display this help and exit
@@ -34,12 +34,13 @@ Commands:
   cd DIR          Change directory used for relative filenames
   help            Display list of commands
   kill FILE...    Unload FILE(s)
-  [list]          List loaded files (default command if no FILE given)
-  [load] FILE...  Load FILE(s) (default command if FILE(s) are given)
-  repl            Interactively talk to server directly
+  [list]          List loaded files (default if no FILE given)
+  [load] FILE...  Load FILE(s) (default if FILE(s) are given)
+  repl            Interactively talk to Rong server directly
   save FILE...    Save FILE(s)
 
-All commands (except 'load') operates on files loaded into Rong.
+If neither COMMAND nor FILE(s) are given, `list` is assumed. If FILE(s) are
+specified but COMMAND is not, then `load` is assumed.
 USAGE_END
 
 ###############################################################################
