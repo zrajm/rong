@@ -18,8 +18,8 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.36';                         # https://semver.org/
-our $VERSION_DATE='19 January 2024';
+our $VERSION='0.0.38';                         # https://semver.org/
+our $VERSION_DATE='20 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -301,13 +301,11 @@ sub start_server {
         warn "(client $id sent, path '$opt{$id}{pwd}'): $line\n"; # received input
         eval {
             my ($cmd, @arg) = deserialize($line);
-            $rong::{"cmd_$cmd"} ? $rong::{"cmd_$cmd"}($id, @arg) : undef;
-        } // do {
-            chomp(my $err = $@ || "Unrecognized command");
-            say "ERR $err";
-            return ();
+            die "Unrecognized command\n" unless $rong::{"cmd_$cmd"};
+            $rong::{"cmd_$cmd"}($id, @arg);
         };
-        say "OK";
+        say $@ ? do { chomp(my $x = $@); "ERR $x" } : 'OK';
+        return not $@;
     }
 }
 

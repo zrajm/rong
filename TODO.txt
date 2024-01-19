@@ -216,7 +216,7 @@
   CLOSED: [2024-01-18 Thu 04:11]
 * DONE Empty arg to `escape()` should return ""
   CLOSED: [2024-01-18 Thu 22:22]
-* [5/11] Improve subcommands
+* [5/12] Improve subcommands
 ** DONE Subcommand functions should not be in hash
    CLOSED: [2024-01-19 Fri 22:35]
 ** DONE `rong` (without args) should start server + list buffers
@@ -242,6 +242,7 @@
    CLOSED: [2024-01-17 Wed 18:50]
    `abspath()` already resolved any symlinks in filename. Added errors for
    fifo, device files etc.
+** TODO `rong kill` -- give error when too few args
 ** TODO `rong load` -- Handle read errors
    Should any catch any errors gotten while reading (in `<$fh>` statement) too.
 ** TODO `rong save` -- Handle write errors
