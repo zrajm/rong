@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.35';                         # https://semver.org/
+our $VERSION='0.0.36';                         # https://semver.org/
 our $VERSION_DATE='19 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -196,54 +196,58 @@ sub start_server {
     # error message.
     my %buf;
     my %opt; # $opt{$id}{$property} where '$id' is a client connection id.
-    my %cmd;
-    %cmd = (
-        cat => sub {
-            my ($id, $file) = @_;
-            $file = abspath($file, $opt{$id}{pwd});
-            die "File not loaded\n" if not exists $buf{$file};
-            print @{$buf{$file}};
-        },
-        cd => sub {
-            my ($id, $dir) = @_;
-            if (defined $dir) {
-                my $newdir = abspath($dir, $opt{$id}{pwd});
-                die "Directory does not exist\n" unless -d $newdir;
-                $opt{$id}{pwd} = $newdir;
-            }
-            say $opt{$id}{pwd};
-        },
-        help => sub {
-            my ($id, @arg) = @_;
-            die "No args allowed\n" if @arg;
-            say join(' ', sort keys %cmd);
-        },
-        kill => sub {
-            my ($id, $file) = @_;
-            $file = abspath($file, $opt{$id}{pwd});
-            die "File not loaded\n" if not exists $buf{$file};
-            delete $buf{$file};
-        },
-        list => sub {
-            my ($id, @arg) = @_;
-            die "No args allowed\n" if @arg;
-            print map {
-                escape(relpath($_, $opt{$id}{pwd})) . "\n";
-            } sort keys(%buf);
-        },
-        load => sub {
-            my ($id, $file) = @_;
-            $file = abspath($file, $opt{$id}{pwd});
-            die "File already loaded\n" if exists $buf{$file};
-            $buf{$file} = load_file($file);
-        },
-        save => sub {
-            my ($id, $file) = @_;
-            $file = abspath($file, $opt{$id}{pwd});
-            die "File not loaded\n" if not exists $buf{$file};
-            save_file("$opt{$id}{pwd}/$file", $buf{$file});
-        },
-    );
+
+    sub cmd_cat {
+        my ($id, $file) = @_;
+        $file = abspath($file, $opt{$id}{pwd});
+        die "File not loaded\n" if not exists $buf{$file};
+        print @{$buf{$file}};
+    }
+
+    sub cmd_cd {
+        my ($id, $dir) = @_;
+        if (defined $dir) {
+            my $newdir = abspath($dir, $opt{$id}{pwd});
+            die "Directory does not exist\n" unless -d $newdir;
+            $opt{$id}{pwd} = $newdir;
+        }
+        say $opt{$id}{pwd};
+    }
+
+    sub cmd_help {
+        my ($id, @arg) = @_;
+        die "No args allowed\n" if @arg;
+        say join(' ', sort(subcommands()));
+    }
+
+    sub cmd_kill {
+        my ($id, $file) = @_;
+        $file = abspath($file, $opt{$id}{pwd});
+        die "File not loaded\n" if not exists $buf{$file};
+        delete $buf{$file};
+    }
+
+    sub cmd_list {
+        my ($id, @arg) = @_;
+        die "No args allowed\n" if @arg;
+        print map {
+            escape(relpath($_, $opt{$id}{pwd})) . "\n";
+        } sort keys(%buf);
+    }
+
+    sub cmd_load {
+        my ($id, $file) = @_;
+        $file = abspath($file, $opt{$id}{pwd});
+        die "File already loaded\n" if exists $buf{$file};
+        $buf{$file} = load_file($file);
+    }
+
+    sub cmd_save {
+        my ($id, $file) = @_;
+        $file = abspath($file, $opt{$id}{pwd});
+        die "File not loaded\n" if not exists $buf{$file};
+        save_file("$opt{$id}{pwd}/$file", $buf{$file});
+    }
 
     # Note: escape() & serialize() are used externally (and must therefore not
     # die()), while unescape() and deserialize() are not (and may die()).
@@ -289,7 +293,7 @@ sub start_server {
         delete $opt{$id};
     }
 
-    sub subcommands { keys(%cmd) }
+    sub subcommands { map { /^cmd_(.*)/ ? $1 : () } keys(%rong::) }
 
     # Result should always end in one line starting with 'OK' or 'ERR'.
     sub invoke {
@@ -297,7 +301,7 @@ sub start_server {
         warn "(client $id sent, path '$opt{$id}{pwd}'): $line\n"; # received input
         eval {
             my ($cmd, @arg) = deserialize($line);
-            exists($cmd{$cmd}) ? $cmd{$cmd}($id, @arg) : undef;
+            $rong::{"cmd_$cmd"} ? $rong::{"cmd_$cmd"}($id, @arg) : undef;
         } // do {
             chomp(my $err = $@ || "Unrecognized command");
             say "ERR $err";
@@ -410,7 +414,7 @@ send_command(my $result, $server, rong::serialize(
 
 # Get subcommand from command line.
 my $cmd = do {
-    my %cmds = map { $_ => 1 } (rong::subcommands, 'repl');
+    my %cmds = map { $_ => 1 } (rong::subcommands(), 'repl');
     @arg == 0           ? 'list' :             # no args
         !$cmds{$arg[0]} ? 'load'               # only filenames given
                         : shift(@arg);         # 1st arg is subcommand

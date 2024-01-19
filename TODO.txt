@@ -216,8 +216,9 @@
   CLOSED: [2024-01-18 Thu 04:11]
 * DONE Empty arg to `escape()` should return ""
   CLOSED: [2024-01-18 Thu 22:22]
-* [4/11] Improve subcommands
-** TODO Subcommand functions should not be in hash
+* [5/11] Improve subcommands
+** DONE Subcommand functions should not be in hash
+   CLOSED: [2024-01-19 Fri 22:35]
 ** DONE `rong` (without args) should start server + list buffers
    CLOSED: [2024-01-19 Fri 20:43]
    This should start the daemon process and then immediately exist the client.
