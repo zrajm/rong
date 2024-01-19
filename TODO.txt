@@ -300,7 +300,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [1/4] Improve error messages & help
+* [2/6] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -311,6 +311,28 @@
 
    Was the result of a `$SIG{__DIE__}` hook being invoked inside an `eval { }`
    block.
+** DONE Better sigdie handling
+   CLOSED: [2024-01-19 Fri 19:46]
+   Instead of having to `local $SIG{__DIE__} = 'DEFAULT'` inside of each eval
+   block, the sigdie handler should detect that it was called from inside an
+   eval, and not do it's usual error message rewriting.
+
+   It was surprisingly hard to find a good description of how to avoid this,
+   but I finally found it, hidden away in the perlfunc manpage (under the
+   description of `die` function). Rather than giving a full code example, the
+   manpage simply states that one should add the line `die @_ if $^S;` as the
+   first line of any `$SIG{__DIE__}` handler.
+
+   While searching for a way to do this I found the special Perl variable
+   `$^S`, but had a hard time finding any more info since special characters
+   aren't very googlable. I did find the following pages helpful though:
+
+     + [[https://www.perlmonks.org/?node_id=51097][Perl's Warn and Die Signals (on Perlmonks)]]
+     + [[https://www.perlmonks.org/?node_id=42411][SIGDIE (on Perlmonks)]]
+     + perlfunc manpage (at end of description for `die`)
+     + perlvar manpage (both under `%SIG` and `$^S`)
+ 
+** TODO Sigdie handling should be setup at beginning of main
 ** TODO Make error messages more user friendly
   When invoking command from the command line, like so
 

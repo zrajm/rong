@@ -18,8 +18,8 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.31';                         # https://semver.org/
-our $VERSION_DATE='18 January 2024';
+our $VERSION='0.0.32';                         # https://semver.org/
+our $VERSION_DATE='19 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [FILE]...
@@ -294,7 +294,6 @@ sub start_server {
         my ($id, $line) = @_;
         warn "(client $id sent, path '$opt{$id}{pwd}'): $line\n"; # received input
         eval {
-            local $SIG{__DIE__} = 'DEFAULT';
             my ($cmd, @arg) = deserialize($line);
             exists($cmd{$cmd}) ? $cmd{$cmd}($id, @arg) : undef;
         } // do {
@@ -351,7 +350,6 @@ sub send_command(\$$$) {
     # Read server response.
     if ($sockets->can_read) {
         $$reply = eval {
-            local $SIG{__DIE__} = 'DEFAULT';
             $fh->recv(my $reply, 1024*1024) // die "Cannot read server response\n";
             chomp($reply);
             $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m;
@@ -372,6 +370,7 @@ my $socket  = File::Spec->join($tempdir, "default");
 my $logfile = File::Spec->join($tempdir, "default.log");
 
 local $SIG{__DIE__} = sub {
+    die @_ if $^S;                             # abort if called inside eval
     my $program = (File::Spec->splitpath(__FILE__))[2];
     # When not called from function, add extra help.
     die("$program: @_", defined(caller(1))
