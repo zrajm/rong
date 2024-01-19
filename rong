@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.32';                         # https://semver.org/
+our $VERSION='0.0.33';                         # https://semver.org/
 our $VERSION_DATE='19 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -365,10 +365,6 @@ sub send_command(\$$$) {
 ###############################################################################
 # Main
 
-my $tempdir = create_tempdir();
-my $socket  = File::Spec->join($tempdir, "default");
-my $logfile = File::Spec->join($tempdir, "default.log");
-
 local $SIG{__DIE__} = sub {
     die @_ if $^S;                             # abort if called inside eval
     my $program = (File::Spec->splitpath(__FILE__))[2];
@@ -376,6 +372,10 @@ local $SIG{__DIE__} = sub {
     die("$program: @_", defined(caller(1))
         ? '' : "Try '$program --help' for more information.\n");
 };
+
+my $tempdir = create_tempdir();
+my $socket  = File::Spec->join($tempdir, "default");
+my $logfile = File::Spec->join($tempdir, "default.log");
 
 my @arg;
 while (@ARGV) {

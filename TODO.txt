@@ -300,7 +300,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [2/6] Improve error messages & help
+* [3/6] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -332,7 +332,8 @@
      + perlfunc manpage (at end of description for `die`)
      + perlvar manpage (both under `%SIG` and `$^S`)
  
-** TODO Sigdie handling should be setup at beginning of main
+** DONE Sigdie handling should be setup at beginning of main
+   CLOSED: [2024-01-19 Fri 20:14]
 ** TODO Make error messages more user friendly
   When invoking command from the command line, like so
 
