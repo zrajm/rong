@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.38';                         # https://semver.org/
+our $VERSION='0.0.39';                         # https://semver.org/
 our $VERSION_DATE='20 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -199,8 +199,9 @@ sub start_server {
 
     sub cmd_cat {
         my ($id, $file) = @_;
+        die "No file specified\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
-        die "File not loaded\n" if not exists $buf{$file};
+        die "No such file loaded\n" if not exists $buf{$file};
         print @{$buf{$file}};
     }
 
@@ -216,20 +217,21 @@ sub start_server {
 
     sub cmd_help {
         my ($id, @arg) = @_;
-        die "No args allowed\n" if @arg;
+        die "Too many arguments\n" if @arg;
         say join(' ', sort(subcommands()));
     }
 
     sub cmd_kill {
         my ($id, $file) = @_;
+        die "No file specified\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
-        die "File not loaded\n" if not exists $buf{$file};
+        die "No such file loaded\n" if not exists $buf{$file};
         delete $buf{$file};
     }
 
     sub cmd_list {
         my ($id, @arg) = @_;
-        die "No args allowed\n" if @arg;
+        die "Too many arguments\n" if @arg;
         print map {
             escape(relpath($_, $opt{$id}{pwd})) . "\n";
         } sort keys(%buf);
@@ -237,6 +239,7 @@ sub start_server {
 
     sub cmd_load {
         my ($id, $file) = @_;
+        die "No file specified\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "File already loaded\n" if exists $buf{$file};
         $buf{$file} = load_file($file);
@@ -244,9 +247,10 @@ sub start_server {
 
     sub cmd_save {
         my ($id, $file) = @_;
+        die "No file specified\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
-        die "File not loaded\n" if not exists $buf{$file};
-        save_file("$opt{$id}{pwd}/$file", $buf{$file});
+        die "No such file loaded\n" if not exists $buf{$file};
+        save_file($file, $buf{$file});
     }
 
     # Note: escape() & serialize() are used externally (and must therefore not
@@ -433,7 +437,7 @@ if ($cmd ne 'repl') {
 }
 
 # Client: Wait until there's input from either STDIN or $server.
-die "No args allowed\n" if @arg;
+die "Too many arguments\n" if @arg;
 print $greeting;
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
