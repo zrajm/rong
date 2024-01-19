@@ -216,21 +216,27 @@
   CLOSED: [2024-01-18 Thu 04:11]
 * DONE Empty arg to `escape()` should return ""
   CLOSED: [2024-01-18 Thu 22:22]
-* [1/11] Improve subcommands
+* [4/11] Improve subcommands
 ** TODO Subcommand functions should not be in hash
-** TODO `rong` (without args) should start server + list buffers
+** DONE `rong` (without args) should start server + list buffers
+   CLOSED: [2024-01-19 Fri 20:43]
    This should start the daemon process and then immediately exist the client.
    (Under normal circumstances this command is not needed since a server if it
    isn't already running, when starting a client will start it.)
 
    Note: In the future we might want a way to name the server socket, so that
    user may run multiple daemons at the same time.
-** TODO `rong repl`
+** DONE `rong repl`
+   CLOSED: [2024-01-19 Fri 20:43]
    There should be a user greeting, with listing of commands also telling that
    ^C or ^D exists.
-** TODO `rong cd` should allow symlink(s) in path
+** WONT `rong cd` should allow symlink(s) in path
+   CLOSED: [2024-01-19 Fri 20:45]
    When `foo` is symlink to `bar/baz` then cd `foo` should set the current dir
    to `foo` (NOT `bar/baz`)
+
+   All symlinks in paths are currently fully expanded before a file is loaded,
+   so this isn't needed.
 ** DONE `rong load` -- Give error in case of non-files & follow symlinks
    CLOSED: [2024-01-17 Wed 18:50]
    `abspath()` already resolved any symlinks in filename. Added errors for
@@ -300,7 +306,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [3/6] Improve error messages & help
+* [3/8] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -356,6 +362,32 @@
    The command information should be read from the server, so that the REPL
    will show the same help info as the command line client.
 ** TODO Option `--help` and command `help` give same output
+** TODO Failure when loading a symlink
+   When attempting to load a symlinked file that points to a file that is
+   already loaded, the error message isn't very helpful. Look at the following:
+
+       $ rong
+       README.txt
+       $ ls -h le
+       lrwxrwxrwx 1 zrajm zrajm 9 2024-01-17 18:46 le -> README.md
+       $ rong le
+       rong load le: File already loaded
+
+   The error message should include that Rong attempted to load.
+** TODO Error messages from `repl` and other subcommands should look the same
+   Currently there's a difference in error messages between client-only
+   commands (only `repl` at this point in time), and server commands. These
+   should look the same:
+
+       $ rong repl ga
+       rong: No args allowed
+       Try 'rong --help' for more information.
+
+   (The above is missing the full `rong repl` command in the error message.)
+
+       $ rong list ga
+       rong list ga: No args allowed
+ 
 * TODO Accept standard server signals (SIGHUP, SIGINT etc)
   Resist SIGTERM! This is so that `pkill rong` kills client processes but not
   the server.

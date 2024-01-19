@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.33';                         # https://semver.org/
+our $VERSION='0.0.34';                         # https://semver.org/
 our $VERSION_DATE='19 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -34,8 +34,9 @@ Commands:
   cd DIR          Change directory used for relative filenames
   help            Display list of commands
   kill FILE...    Unload FILE(s)
-  list            List loaded files
-  [load] FILE...  Load FILE(s) (default command)
+  [list]          List loaded files (default command if no FILE given)
+  [load] FILE...  Load FILE(s) (default command if FILE(s) are given)
+  repl            Interactively talk to server directly
   save FILE...    Save FILE(s)
 
 All commands (except 'load') operates on files loaded into Rong.
@@ -406,13 +407,16 @@ send_command(my $result, $server, rong::serialize(
     'cd', Cwd::getcwd() // File::Spec->rootdir()
 )) or warn "Cannot change dir: $@";
 
-# Send command(s) to server.
-if (@arg) {
-    # 1st command line arg is command (if recognized) otherwise use 'load'.
-    my $cmd = ($arg[0] =~ /^(?:@{[ join('|', rong::subcommands) ]})$/)
-        ? shift(@arg) : 'load';
+# Get subcommand from command line.
+my $cmd = do {
+    my %cmds = map { $_ => 1 } (rong::subcommands, 'repl');
+    @arg == 0           ? 'list' :             # no args
+        !$cmds{$arg[0]} ? 'load'               # only filenames given
+                        : shift(@arg);         # 1st arg is subcommand
+};
 
-    # Repeat command for each arg (but send one command if no args).
+# Repeat command for each arg (but send one command if no args).
+if ($cmd ne 'repl') {
     for my $arg (@arg ? @arg : undef) {
         my $cmdstr = rong::serialize($cmd, $arg // ());
         if (send_command(my $result, $server, $cmdstr)) {
@@ -426,6 +430,7 @@ if (@arg) {
 }
 
 # Client: Wait until there's input from either STDIN or $server.
+die "No args allowed\n" if @arg;
 print $greeting;
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
