@@ -216,7 +216,7 @@
   CLOSED: [2024-01-18 Thu 04:11]
 * DONE Empty arg to `escape()` should return ""
   CLOSED: [2024-01-18 Thu 22:22]
-* [8/14] Improve subcommands
+* [11/15] Improve subcommands
 ** DONE Subcommand functions should not be in hash
    CLOSED: [2024-01-19 Fri 22:35]
 ** DONE `rong` (without args) should start server + list buffers
@@ -250,9 +250,11 @@
    CLOSED: [2024-01-20 Sat 00:51]
 ** DONE `rong save` -- Give error when too few args
    CLOSED: [2024-01-20 Sat 00:51]
-** TODO `rong load` -- Handle read errors
+** DONE `rong load` -- Handle read errors
+   CLOSED: [2024-01-20 Sat 05:12]
    Should any catch any errors gotten while reading (in `<$fh>` statement) too.
-** TODO `rong save` -- Handle write errors
+** DONE `rong save` -- Handle write errors
+   CLOSED: [2024-01-20 Sat 05:12]
    Should any catch errors gotten while writing (in `print` statement) too.
 ** TODO `rong save` -- Make atomic
 ** TODO `rong cat` -- with no trailing newline

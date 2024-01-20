@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.39';                         # https://semver.org/
+our $VERSION='0.0.40';                         # https://semver.org/
 our $VERSION_DATE='20 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -163,8 +163,11 @@ sub start_server {
         die "Cannot load file: Is a named pipe\n" if -p _;
         die "Cannot load file: Is a socket\n" if -S _;
         open(my $fh, '<', $file) or die "Cannot load file: $!\n";
-        # FIXME: catch errors in <$fh> too
-        my @buf = <$fh>;
+        my @buf;
+        until (eof $fh) {
+            my $x = <$fh> // die "Cannot load file: $!\n";
+            push(@buf, $x);
+        }
         close($fh) or die "Cannot load file: $!\n";
         return \@buf;
     }
@@ -172,8 +175,7 @@ sub start_server {
     sub save_file {
         my ($file, $data) = @_;
         open(my $fh, '>', $file) or die "Cannot save file: $!\n";
-        # FIXME: catch errors in print() too
-        print $fh @{ $data };
+        print($fh @$data) or die "Cannot save file: $!\n";
         close($fh) or die "Cannot save file: $!\n";
     }
 
