@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.40';                         # https://semver.org/
+our $VERSION='0.0.41';                         # https://semver.org/
 our $VERSION_DATE='20 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -157,26 +157,26 @@ sub start_server {
 
     sub load_file {
         my ($file) = @_;
-        die "Cannot load file: Is a directory\n" if -d $file;
-        die "Cannot load file: Is a block device\n" if -b _;
-        die "Cannot load file: Is a character device\n" if -c _;
-        die "Cannot load file: Is a named pipe\n" if -p _;
-        die "Cannot load file: Is a socket\n" if -S _;
-        open(my $fh, '<', $file) or die "Cannot load file: $!\n";
+        die "Cannot load a directory\n" if -d $file;
+        die "Cannot load a block device\n" if -b _;
+        die "Cannot load a character device\n" if -c _;
+        die "Cannot load a named pipe\n" if -p _;
+        die "Cannot load a socket\n" if -S _;
+        open(my $fh, '<', $file) or die "Cannot open file: $!\n";
         my @buf;
         until (eof $fh) {
-            my $x = <$fh> // die "Cannot load file: $!\n";
+            my $x = <$fh> // die "Cannot read file: $!\n";
             push(@buf, $x);
         }
-        close($fh) or die "Cannot load file: $!\n";
+        close($fh) or die "Cannot close file: $!\n";
         return \@buf;
     }
 
     sub save_file {
         my ($file, $data) = @_;
-        open(my $fh, '>', $file) or die "Cannot save file: $!\n";
-        print($fh @$data) or die "Cannot save file: $!\n";
-        close($fh) or die "Cannot save file: $!\n";
+        open(my $fh, '>', $file) or die "Cannot open file: $!\n";
+        print($fh @$data) or die "Cannot write file: $!\n";
+        close($fh) or die "Cannot close file: $!\n";
     }
 
     sub abspath {
@@ -184,7 +184,7 @@ sub start_server {
         $path =~ s#^~[^/]*# glob("'$&'") #e;
         $path = File::Spec->join($base, $path)
             unless File::Spec->file_name_is_absolute($path);
-        $path = Cwd::realpath($path) or die "$!\n";
+        $path = Cwd::realpath($path) or die "Cannot find absolute path: $!\n";
         return $path;
     }
 
@@ -310,7 +310,11 @@ sub start_server {
             die "Unrecognized command\n" unless $rong::{"cmd_$cmd"};
             $rong::{"cmd_$cmd"}($id, @arg);
         };
-        say $@ ? do { chomp(my $x = $@); "ERR $x" } : 'OK';
+        say !$@ ? 'OK' : do {
+            my ($cmd) = $line =~ /(\S+)/;
+            chomp(my $msg = $@);
+            "ERR Command '$cmd': $msg";
+        };
         return not $@;
     }
 }
@@ -432,7 +436,7 @@ if ($cmd ne 'repl') {
             print $result;
         } else {
             my $program = (File::Spec->splitpath(__FILE__))[2];
-            warn "$program $cmdstr: $@";
+            warn "$program: $@";
         }
     }
     exit 0;
