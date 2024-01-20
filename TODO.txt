@@ -263,7 +263,8 @@
    will be at the end of the last line. How do other protocols handle this?
 ** TODO `rong mv`
 ** TODO `rong cp`
-* TODO Failing a command should result in non-zero exit status
+* DONE Failing a command should result in non-zero exit status
+  CLOSED: [2024-01-20 Sat 06:45]
 * TODO Unicode text should work
   How should this be done? Clearly Perl needs to be aware that the loaded text
   is Unicode, but maybe the client-server communication needs to be in raw

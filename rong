@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.41';                         # https://semver.org/
+our $VERSION='0.0.42';                         # https://semver.org/
 our $VERSION_DATE='20 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -430,6 +430,7 @@ my $cmd = do {
 
 # Repeat command for each arg (but send one command if no args).
 if ($cmd ne 'repl') {
+    my $err;
     for my $arg (@arg ? @arg : undef) {
         my $cmdstr = rong::serialize($cmd, $arg // ());
         if (send_command(my $result, $server, $cmdstr)) {
@@ -437,9 +438,10 @@ if ($cmd ne 'repl') {
         } else {
             my $program = (File::Spec->splitpath(__FILE__))[2];
             warn "$program: $@";
+            $err = 1;
         }
     }
-    exit 0;
+    exit($err ? 127 : 0);
 }
 
 # Client: Wait until there's input from either STDIN or $server.
