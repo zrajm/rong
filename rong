@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.42';                         # https://semver.org/
+our $VERSION='0.0.43';                         # https://semver.org/
 our $VERSION_DATE='20 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -201,7 +201,7 @@ sub start_server {
 
     sub cmd_cat {
         my ($id, $file) = @_;
-        die "No file specified\n" unless $file;
+        die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
         print @{$buf{$file}};
@@ -219,13 +219,13 @@ sub start_server {
 
     sub cmd_help {
         my ($id, @arg) = @_;
-        die "Too many arguments\n" if @arg;
+        die "Too many arguments.\n" if @arg;
         say join(' ', sort(subcommands()));
     }
 
     sub cmd_kill {
         my ($id, $file) = @_;
-        die "No file specified\n" unless $file;
+        die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
         delete $buf{$file};
@@ -233,7 +233,7 @@ sub start_server {
 
     sub cmd_list {
         my ($id, @arg) = @_;
-        die "Too many arguments\n" if @arg;
+        die "Too many arguments.\n" if @arg;
         print map {
             escape(relpath($_, $opt{$id}{pwd})) . "\n";
         } sort keys(%buf);
@@ -241,7 +241,7 @@ sub start_server {
 
     sub cmd_load {
         my ($id, $file) = @_;
-        die "No file specified\n" unless $file;
+        die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "File already loaded\n" if exists $buf{$file};
         $buf{$file} = load_file($file);
@@ -249,7 +249,7 @@ sub start_server {
 
     sub cmd_save {
         my ($id, $file) = @_;
-        die "No file specified\n" unless $file;
+        die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
         save_file($file, $buf{$file});
@@ -382,9 +382,9 @@ sub send_command(\$$$) {
 local $SIG{__DIE__} = sub {
     die @_ if $^S;                             # abort if called inside eval
     my $program = (File::Spec->splitpath(__FILE__))[2];
-    # When not called from function, add extra help.
-    die("$program: @_", defined(caller(1))
-        ? '' : "Try '$program --help' for more information.\n");
+    my $more = (my $msg = "@_") =~ s/[.]$//;   # ending in '.' = extra help
+    die("$program: $msg",
+        $more && "Try '$program --help' for more information.\n");
 };
 
 my $tempdir = create_tempdir();
@@ -397,7 +397,7 @@ while (@ARGV) {
     /^--$/ and do { push(@arg, @ARGV); last };
     /^(-h|--help)$/ and help();
     /^(-V|--version)$/ and version();
-    /^-./ and die "Unrecognized option '$_'\n";
+    /^-./ and die "Unrecognized option '$_'.\n";
     push(@arg, $_);
 }
 
@@ -431,21 +431,25 @@ my $cmd = do {
 # Repeat command for each arg (but send one command if no args).
 if ($cmd ne 'repl') {
     my $err;
+    my $more;
+    my $program = (File::Spec->splitpath(__FILE__))[2];
     for my $arg (@arg ? @arg : undef) {
         my $cmdstr = rong::serialize($cmd, $arg // ());
         if (send_command(my $result, $server, $cmdstr)) {
             print $result;
         } else {
-            my $program = (File::Spec->splitpath(__FILE__))[2];
-            warn "$program: $@";
-            $err = 1;
+            chomp(my $msg = $@);
+            $err  = 1;
+            $more = 1 if $msg =~ s/[.]$//;     # ending in '.' = extra help
+            warn "$program: $msg\n";
         }
     }
+    warn "Try '$program --help' for more information.\n" if $more;
     exit($err ? 127 : 0);
 }
 
 # Client: Wait until there's input from either STDIN or $server.
-die "Too many arguments\n" if @arg;
+die "Too many arguments.\n" if @arg;
 print $greeting;
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
@@ -461,7 +465,8 @@ while (my @ready = $sockets->can_read) {
                 print $result;
                 say "OK";
             } else {
-                print "ERR $@";
+                (my $msg = "$@") =~ s/[.]$//;  # strip trailing '.'
+                print "ERR $msg";
             }
         }
     }

@@ -318,7 +318,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [3/8] Improve error messages & help
+* [4/8] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -352,7 +352,8 @@
  
 ** DONE Sigdie handling should be setup at beginning of main
    CLOSED: [2024-01-19 Fri 20:14]
-** TODO Make error messages more user friendly
+** DONE Make error messages more user friendly
+   CLOSED: [2024-01-20 Sat 08:15]
   When invoking command from the command line, like so
 
       $ rong list osuh
@@ -373,7 +374,9 @@
 ** TODO Fetch help info from server
    The command information should be read from the server, so that the REPL
    will show the same help info as the command line client.
-** TODO Option `--help` and command `help` give same output
+** TODO Option `--help` and command `help` should give same output
+   When this is done the "Try 'rong --help' for more information." should say
+   `rong help` and `rong help COMMAND` rather than the current `rong --help`.
 ** TODO Failure when loading a symlink
    When attempting to load a symlinked file that points to a file that is
    already loaded, the error message isn't very helpful. Look at the following:
