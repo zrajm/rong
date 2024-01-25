@@ -265,13 +265,19 @@
 ** TODO `rong cp`
 * DONE Failing a command should result in non-zero exit status
   CLOSED: [2024-01-20 Sat 06:45]
-* TODO Unicode text should work
-  How should this be done? Clearly Perl needs to be aware that the loaded text
-  is Unicode, but maybe the client-server communication needs to be in raw
-  mode? See manpages for IO::Handle, IO::File, and IO::Socket.
+* [1/4] Make Unicode work (in socket communication)
+** DONE Refactor socket creation
+   CLOSED: [2024-01-25 Thu 10:15]
+   Refactored `connection_socket()` and `listening_socket()`, combining them
+   into single function.
+** DONE Is `autoflush()` still needed? -- YES
+   CLOSED: [2024-01-25 Thu 11:12]
+   According to `perlfunc` manpage `sysread()` bypass Perl IO buffering, but
+   `perlvar` says autoflush is about OUTPUT, so yes, `autoflush()` is still
+   needed.
 ** TODO Use sysread for sockets?
    See also: https://stackoverflow.com/a/5600853/351162 (diff <>, sysread, rect)
-   Raw fileread: https://www.perlmonks.org/?node_id=1195588
+   Raw file read: https://www.perlmonks.org/?node_id=1195588
 
    On nonblocking sockets and ->connected():
    https://www.ralph-schuster.eu/2015/06/19/nonblocking-sockets-and-perls-netdaemon/
@@ -285,6 +291,79 @@
    Sysread doesn't allow Unicode, but if set up so that just raw bytes are
    shuffled over the socket that shouldn't matter. (The benefit of this is to
    avoid hangs.)
+** TODO Use `sysread()` for all input (sockets and STDIN)
+   Since all sockets use `sysread()`, also read STDIN using `sysread()` (as
+   this simplifies code). `sysread()` cannot be used in input marked as utf8,
+   so therefore STDIN needs to be set to `:raw` mode using `binmode(STDIN,
+   ':raw')`.
+
+   File operations should be used for stream sockets. (`recv()` is meant for
+   datagram sockets, which is not what Rong is using).
+** TODO Explicitly encode/decode socket communication
+   `sysread()` cannot be used for file handles marked as utf8, meaning that all
+    input must be manually decoded.
+* [0/5] Make sure the sockets are done correctly
+  Read up on sockets: https://docstore.mik.ua/orelly/perl4/cook/ch17_04.htm
+** TODO Overview
+   Many of the syscalls used for sockets have very cursory descriptions in
+   `perlfunc` but are more thoroughly described in individual manpages: `recv`,
+   `send` etc.
+
+   Sockets are subject to both `stdio` buffering (which can be turned off with
+   `$fh->autoflush(1)` -- which is needed when using a line-based protocol) and
+   buffering at the operating system level (which, for TCP-sockets, can be
+   disabled with the socket option TCP_NODELAY -- though this should only be
+   done for applications that send real-time data, such as mouse movements or
+   individual key presses).
+
+   There are two types of sockets (Rong uses a streaming socket).
+
+   + Streams (TCP-like)
+     - Use file functions (except `seek` and `sysseek`).
+
+   + Datagram (UDP-like)
+     - Use `send()` and `recv()`.
+ 
+** TODO Are credentials needed, or is socket file access enough?
+** TODO How send byte-by-byte real-time data through socket? (for interactive mode)
+** TODO How make client detect when server disappear? (to abort immediately)
+   Source from: https://www.perlmonks.org/?node_id=11106953
+   Here the client have a 2 second timeout, and disconnects if server does not
+   respond within that time frame. This is probably not the method to use.
+
+       #!/usr/bin/perl
+       use strict;
+       use warnings;
+       use IO::Socket::UNIX;
+       use constant SOCKET => 'test_socket.sock';
+       my $mode = shift or die "Specify a mode\n";
+       if ($mode eq 'server') {
+           my $server = IO::Socket::UNIX->new(
+               Type    => SOCK_STREAM,
+               Local   => SOCKET,
+               Listen  => 1,
+               Timeout => 2,
+           ) or die $!;
+           while (my $conn = $server->accept()) {
+               my $name = <$conn>;
+               print {$conn} "Hello $name";
+               close $conn;
+           }
+           print 'Timed out', "\n";
+       }
+       elsif ($mode eq 'client') {
+           my $client = IO::Socket::UNIX->new(
+               Type    => SOCK_STREAM,
+               Peer    => SOCKET,
+           ) or die $!;
+           print {$client} 'John', "\n";
+           print "Got reponse: ", scalar <$client>;
+           close $client;
+       }
+       else {
+           die "Unsupported mode: $mode\n";
+       }
+ 
 * [0/8] Protocol
 ** TODO Format: Multi-line server response? (for interactive `help` command)
    I want the server to be able to talk to a user for exploratory purposes.

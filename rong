@@ -18,8 +18,8 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.43';                         # https://semver.org/
-our $VERSION_DATE='20 January 2024';
+our $VERSION='0.0.44';                         # https://semver.org/
+our $VERSION_DATE='25 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -74,32 +74,15 @@ sub create_tempdir {
     return $dir;
 }
 
-# Used by client to connect to server.
-sub connection_socket {
-    my ($socket_path) = @_;
-    my $fh = IO::Socket::UNIX->new(
-        Type => SOCK_STREAM(),
-        Peer => $socket_path,
-    );
-    $fh->autoflush(1) if $fh;
-    return $fh;
-}
-
-# Used by server to listen for new client connections.
-sub listening_socket {
-    my ($socket_path) = @_;
-    if (-e $socket_path) {
-        -S $socket_path
-            or die "Will not delete non-socket file '$socket_path'\n";
-        unlink $socket_path
-            or die "Cannot delete previous socket '$socket_path': $!\n";
+sub make_socket {
+    my %opt = @_;
+    if (my $file = $opt{Local} and -e $opt{Local}) { # remove old file (if any)
+        die "Cannot delete non-socket file '$file'\n" unless -S $file;
+        unlink $file or die "Cannot delete previous socket '$file': $!\n";
     }
-    my $fh = IO::Socket::UNIX->new(
-        Listen => 1,
-        Type => SOCK_STREAM(),
-        Local => $socket_path,
-    );
-    $fh->autoflush(1) if $fh;
+    my $fh = IO::Socket::UNIX->new(%opt, Type => SOCK_STREAM)
+        or return ();
+    $fh->autoflush(1);
     return $fh;
 }
 
@@ -107,14 +90,14 @@ sub start_server {
     my ($socket_path, $logfile) = @_;
 
     # If server is already running, return connection to that.
-    if (my $clientfh = connection_socket($socket_path)) {
+    if (my $clientfh = make_socket(Peer => $socket_path)) {
         return $clientfh;
     }
 
     # Create server's listening socket to which new clients connect (it's
     # inherited by child processes). Done BEFORE forking avoid race condition
     # where child tries to connect and listening socket isn't yet there.
-    my $listenfh = listening_socket($socket_path)
+    my $listenfh = make_socket(Local => $socket_path, Listen => 1)
         or die("Cannot create socket '$socket_path': $IO::Socket::errstr\n");
 
     # Start intermediate process (session leader in new session).
@@ -141,7 +124,7 @@ sub start_server {
     # Client process (original process).
     close $listenfh;                           # close listening socket
     wait;                                      # reap intermediate process
-    return connection_socket($socket_path)     # connect to new server
+    return make_socket(Peer => $socket_path);  # connect to new server
 }
 
 {
