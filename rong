@@ -18,7 +18,7 @@ use File::Spec;
 use Cwd;
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.44';                         # https://semver.org/
+our $VERSION='0.0.45';                         # https://semver.org/
 our $VERSION_DATE='25 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -86,13 +86,18 @@ sub make_socket {
     return $fh;
 }
 
+sub make_accept {
+    my ($fh) = @_;
+    my $newfh = $fh->accept();
+    $newfh->autoflush(1);
+    return $newfh;
+}
+
 sub start_server {
     my ($socket_path, $logfile) = @_;
 
     # If server is already running, return connection to that.
-    if (my $clientfh = make_socket(Peer => $socket_path)) {
-        return $clientfh;
-    }
+    if (my $fh = make_socket(Peer => $socket_path)) { return $fh }
 
     # Create server's listening socket to which new clients connect (it's
     # inherited by child processes). Done BEFORE forking avoid race condition
@@ -309,12 +314,10 @@ sub server_main {
     while (my @ready = $sockets->can_read) {
         foreach my $fh (@ready) {              #   for each input
             if ($fh == $listenfh) {            #      client connected
-                my $clientfh = $listenfh->accept;
-                if ($clientfh) {
-                    $clientfh->autoflush(1);
-                    $sockets->add($clientfh);
-                    select($clientfh);
-                    rong::initialize(fileno($clientfh), $listenfile);
+                if (my $fh = make_accept($listenfh)) {
+                    $sockets->add($fh);
+                    select($fh);
+                    rong::initialize(fileno($fh), $listenfile);
                 }
                 next;
             }

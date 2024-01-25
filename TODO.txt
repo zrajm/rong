@@ -265,7 +265,7 @@
 ** TODO `rong cp`
 * DONE Failing a command should result in non-zero exit status
   CLOSED: [2024-01-20 Sat 06:45]
-* [1/4] Make Unicode work (in socket communication)
+* [3/6] Make Unicode work (in socket communication)
 ** DONE Refactor socket creation
    CLOSED: [2024-01-25 Thu 10:15]
    Refactored `connection_socket()` and `listening_socket()`, combining them
@@ -275,6 +275,8 @@
    According to `perlfunc` manpage `sysread()` bypass Perl IO buffering, but
    `perlvar` says autoflush is about OUTPUT, so yes, `autoflush()` is still
    needed.
+** DONE Refactor accepting socket connection
+   CLOSED: [2024-01-25 Thu 11:50]
 ** TODO Use sysread for sockets?
    See also: https://stackoverflow.com/a/5600853/351162 (diff <>, sysread, rect)
    Raw file read: https://www.perlmonks.org/?node_id=1195588
