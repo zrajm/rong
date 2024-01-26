@@ -265,7 +265,10 @@
 ** TODO `rong cp`
 * DONE Failing a command should result in non-zero exit status
   CLOSED: [2024-01-20 Sat 06:45]
-* [3/6] Make Unicode work (in socket communication)
+* [6/13] Make Unicode work (in socket communication)
+  :PROPERTIES:
+  :COOKIE_DATA: todo recursive
+  :END:
 ** DONE Refactor socket creation
    CLOSED: [2024-01-25 Thu 10:15]
    Refactored `connection_socket()` and `listening_socket()`, combining them
@@ -277,7 +280,18 @@
    needed.
 ** DONE Refactor accepting socket connection
    CLOSED: [2024-01-25 Thu 11:50]
-** TODO Use sysread for sockets?
+** DONE Explicitly decode command line arguments
+   CLOSED: [2024-01-26 Fri 01:39]
+** DONE Use `sysread()` for all input (sockets and STDIN)
+   CLOSED: [2024-01-26 Fri 02:30]
+   Since all sockets use `sysread()`, also read STDIN using `sysread()` (as
+   this simplifies code). `sysread()` cannot be used in input marked as utf8,
+   so therefore STDIN needs to be set to `:raw` mode using `binmode(STDIN,
+   ':raw')`.
+
+   File operations should be used for stream sockets. (`recv()` is meant for
+   datagram sockets, which is not what Rong is using).
+
    See also: https://stackoverflow.com/a/5600853/351162 (diff <>, sysread, rect)
    Raw file read: https://www.perlmonks.org/?node_id=1195588
 
@@ -293,18 +307,38 @@
    Sysread doesn't allow Unicode, but if set up so that just raw bytes are
    shuffled over the socket that shouldn't matter. (The benefit of this is to
    avoid hangs.)
-** TODO Use `sysread()` for all input (sockets and STDIN)
-   Since all sockets use `sysread()`, also read STDIN using `sysread()` (as
-   this simplifies code). `sysread()` cannot be used in input marked as utf8,
-   so therefore STDIN needs to be set to `:raw` mode using `binmode(STDIN,
-   ':raw')`.
+** DONE Explicitly encode output of all subcommands
+   CLOSED: [2024-01-26 Fri 05:29]
+** TODO Explicitly encode/decode all dirs, filenames and paths
+   Look the use of `__FILE__`, operations done with `File::Spec` and `Cwd`.
+   Write wrapper functions that makes sure that all of these functions only
+   return strings for which `is_utf8()` returns true.
 
-   File operations should be used for stream sockets. (`recv()` is meant for
-   datagram sockets, which is not what Rong is using).
+   Unicode should work in:
+
+     + Current dir
+     + Tempdir
+     + __FILE__
+     + Filenames
+ 
+** TODO Make sure 2nd arg of `read_input()` is used where needed
+** [0/4] Refactor `server_main()`
+*** TODO Should use `$id` instead of `$fn`
+*** TODO `rong::initialize()` should be called with $id as arg
+    That is, there should be a separate line `my $id = fileno($fh)`, and then
+    it should be called with `rong::initialize($id, $listenfile)`
+*** TODO Add error indicator after infinite loop
+    If something ever breaks out of the infinite loop, that should (at least)
+    print an error in the error log. Add something like the following after the
+    loop in `server_main()`.
+
+        die "THIS CANNOT HAPPEN\n";
+ 
+*** TODO When reading, use same variable name
 ** TODO Explicitly encode/decode socket communication
    `sysread()` cannot be used for file handles marked as utf8, meaning that all
     input must be manually decoded.
-* [0/5] Make sure the sockets are done correctly
+* [0/5] Make sure the sockets are used correctly
   Read up on sockets: https://docstore.mik.ua/orelly/perl4/cook/ch17_04.htm
 ** TODO Overview
    Many of the syscalls used for sockets have very cursory descriptions in

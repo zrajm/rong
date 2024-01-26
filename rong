@@ -16,10 +16,11 @@ use IO::Select;
 use POSIX;
 use File::Spec;
 use Cwd;
+use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.45';                         # https://semver.org/
-our $VERSION_DATE='25 January 2024';
+our $VERSION='0.0.46';                         # https://semver.org/
+our $VERSION_DATE='26 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -73,6 +74,32 @@ sub create_tempdir {
         unless -d $dir;
     return $dir;
 }
+
+{
+    state $opt = Encode::FB_CROAK | Encode::LEAVE_SRC;
+    sub encode { eval { Encode::encode('UTF-8', shift // $_, $opt) } }
+    sub decode { eval { Encode::decode('UTF-8', shift // $_, $opt) } }
+}
+
+# Return input string or, or error or end-of-file, undef. Also set `$@` to
+# error message (in case of error), or `undef`. If both return value and `$@`
+# is `undef`, then an end-of-input was reached.
+#
+# Second arg is the file handle of the server connection, if any. If `$fh` and
+# `$server` refer to the same file then any error message will refer to
+# 'server', otherwise (if `$server` is `undef` or `$server != $fh`) error
+# message will refer to 'client'.
+sub input {
+    my ($fh, $server) = @_;
+    my $src = $fh ne ($server // '') ? 'client' : 'server';
+    return eval {
+        my $size = sysread($fh, my $raw, 1024 * 1024);
+        die("Cannot read from $src: $!\n") if not defined $size;
+        return () if $size == 0;
+        decode($raw) or die("Cannot decode string from $src: $@");
+    };
+}
+sub output { syswrite select(), encode join('', @_) }
 
 sub make_socket {
     my %opt = @_;
@@ -192,7 +219,7 @@ sub start_server {
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
-        print @{$buf{$file}};
+        main::output @{$buf{$file}};
     }
 
     sub cmd_cd {
@@ -202,13 +229,13 @@ sub start_server {
             die "Directory does not exist\n" unless -d $newdir;
             $opt{$id}{pwd} = $newdir;
         }
-        say $opt{$id}{pwd};
+        main::output "$opt{$id}{pwd}\n";
     }
 
     sub cmd_help {
         my ($id, @arg) = @_;
         die "Too many arguments.\n" if @arg;
-        say join(' ', sort(subcommands()));
+        main::output join(' ', sort(subcommands())) . "\n";
     }
 
     sub cmd_kill {
@@ -222,7 +249,7 @@ sub start_server {
     sub cmd_list {
         my ($id, @arg) = @_;
         die "Too many arguments.\n" if @arg;
-        print map {
+        main::output map {
             escape(relpath($_, $opt{$id}{pwd})) . "\n";
         } sort keys(%buf);
     }
@@ -278,7 +305,7 @@ sub start_server {
         my $program = (File::Spec->splitpath(__FILE__))[2];
         $opt{$id} = { pwd => File::Spec->rootdir() };
         warn "(client $id connected, path '$opt{$id}{pwd}')\n";
-        say "OK $program $VERSION $listenfile";
+        main::output "OK $program $VERSION $listenfile\n";
     }
 
     sub terminate {
@@ -298,7 +325,7 @@ sub start_server {
             die "Unrecognized command\n" unless $rong::{"cmd_$cmd"};
             $rong::{"cmd_$cmd"}($id, @arg);
         };
-        say !$@ ? 'OK' : do {
+        main::output !$@ ? 'OK' : do {
             my ($cmd) = $line =~ /(\S+)/;
             chomp(my $msg = $@);
             "ERR Command '$cmd': $msg";
@@ -322,7 +349,8 @@ sub server_main {
                 next;
             }
             my $fn = fileno($fh);
-            defined(my $line = <$fh>) or do {  #      client disconnected
+            my $line = input($fh) // do {      #      client disconnected
+                warn "(client $fn) ERROR! $@\n" if $@;
                 rong::terminate($fn);
                 $sockets->remove($fh);
                 $fh->close;
@@ -344,13 +372,13 @@ sub send_command(\$$$) {
 
     # Send command.
     if ($sockets->can_write) {
-        say $fh $cmdstr;
+        syswrite $fh, encode($cmdstr);
     }
 
     # Read server response.
     if ($sockets->can_read) {
         $$reply = eval {
-            $fh->recv(my $reply, 1024*1024) // die "Cannot read server response\n";
+            my $reply = input($fh) // die($@ // "Server exited\n");
             chomp($reply);
             $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m;
             my ($status, $msg) = ($1 // '', $2);
@@ -379,7 +407,7 @@ my $logfile = File::Spec->join($tempdir, "default.log");
 
 my @arg;
 while (@ARGV) {
-    local $_ = shift(@ARGV);
+    local $_ = decode shift(@ARGV);
     /^--$/ and do { push(@arg, @ARGV); last };
     /^(-h|--help)$/ and help();
     /^(-V|--version)$/ and version();
@@ -395,7 +423,8 @@ my $sockets = IO::Select->new($server);
 # Verify server greeting.
 my $greeting;
 if ($sockets->can_read) {
-    defined($greeting = <$server>) or die "Cannot read server greeting: $!\n";
+    $greeting = input($server)
+        // die "Cannot read server greeting: " . ($@ // "Server exited\n");
     die "Cannot understand server greeting\n",
         "    expected: OK rong #.#.# $socket\n",
         "    but got : $greeting"
@@ -437,16 +466,19 @@ if ($cmd ne 'repl') {
 # Client: Wait until there's input from either STDIN or $server.
 die "Too many arguments.\n" if @arg;
 print $greeting;
+binmode(STDIN, ':raw');
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
-        if ($fh == $server) {                  # from server -> write to STDOUT
-            $fh->recv(my $x, 1024*1024) // die "Cannot read server response\n";
-            chomp($x);
+        my $x = input($fh, $server) // do {
+            die $@ if $@;
+            die "Server exited\n" if $fh eq $server;
+            exit;                              # ^D from STDIN = exit
+        };
+        chomp($x);
+        if ($fh eq $server) {                  # from server -> write to STDOUT
             say $x;
         } else {                               # from STDIN -> write to server
-            defined(my $x = <$fh>) or exit;    # ^D from STDIN = exit
-            chomp($x);
             if (send_command(my $result, $server, $x)) {
                 print $result;
                 say "OK";
