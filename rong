@@ -19,7 +19,7 @@ use Cwd;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.46';                         # https://semver.org/
+our $VERSION='0.0.47';                         # https://semver.org/
 our $VERSION_DATE='26 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -325,11 +325,9 @@ sub start_server {
             die "Unrecognized command\n" unless $rong::{"cmd_$cmd"};
             $rong::{"cmd_$cmd"}($id, @arg);
         };
-        main::output !$@ ? 'OK' : do {
-            my ($cmd) = $line =~ /(\S+)/;
-            chomp(my $msg = $@);
-            "ERR Command '$cmd': $msg";
-        };
+        main::output $@
+            ? "ERR Command '@{[ (split /\s+/, $line, 2)[0] ]}': $@"
+            : "OK\n";
         return not $@;
     }
 }
@@ -337,30 +335,32 @@ sub start_server {
 sub server_main {
     my ($listenfh, $listenfile) = @_;
     warn "(server started)\n";
-    my $sockets = IO::Select->new($listenfh);  # wait for input on sockets
+    my $sockets = IO::Select->new($listenfh);
     while (my @ready = $sockets->can_read) {
-        foreach my $fh (@ready) {              #   for each input
-            if ($fh == $listenfh) {            #      client connected
+        foreach my $fh (@ready) {
+            if ($fh == $listenfh) {            # new client connected
                 if (my $fh = make_accept($listenfh)) {
+                    my $id = fileno($fh);
                     $sockets->add($fh);
-                    select($fh);
-                    rong::initialize(fileno($fh), $listenfile);
+                    select $fh;
+                    rong::initialize($id, $listenfile);
                 }
                 next;
             }
-            my $fn = fileno($fh);
-            my $line = input($fh) // do {      #      client disconnected
-                warn "(client $fn) ERROR! $@\n" if $@;
-                rong::terminate($fn);
+            my $id = fileno($fh);
+            my $line = input($fh) // do {      # client disconnected
+                warn "(client $id) ERROR! $@\n" if $@;
+                rong::terminate($id);
                 $sockets->remove($fh);
-                $fh->close;
+                close $fh;
                 next;
             };
-            chomp $line;
-            select($fh);
-            rong::invoke($fn, $line);
+            chomp $line;                       # client sent a command
+            select $fh;
+            rong::invoke($id, $line);
         }
     }
+    die "THIS CANNOT HAPPEN\n";                # above loop never exits
 }
 
 # Send $cmdstring to server $fh, setting $reply to the response gotten from
@@ -369,17 +369,13 @@ sub server_main {
 sub send_command(\$$$) {
     my ($reply, $fh, $cmdstr) = @_;
     my $sockets = IO::Select->new($fh);
-
-    # Send command.
-    if ($sockets->can_write) {
-        syswrite $fh, encode($cmdstr);
+    if ($sockets->can_write) {                 # send command to server
+        syswrite $fh, encode $cmdstr;
     }
-
-    # Read server response.
-    if ($sockets->can_read) {
+    if ($sockets->can_read) {                  # read server response
         $$reply = eval {
             my $reply = input($fh) // die($@ // "Server exited\n");
-            chomp($reply);
+            chomp $reply;
             $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m;
             my ($status, $msg) = ($1 // '', $2);
             die "$msg\n" if $status eq 'ERR';
@@ -470,16 +466,16 @@ binmode(STDIN, ':raw');
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
-        my $x = input($fh, $server) // do {
+        my $input = input($fh, $server) // do {
             die $@ if $@;
             die "Server exited\n" if $fh eq $server;
             exit;                              # ^D from STDIN = exit
         };
-        chomp($x);
-        if ($fh eq $server) {                  # from server -> write to STDOUT
-            say $x;
-        } else {                               # from STDIN -> write to server
-            if (send_command(my $result, $server, $x)) {
+        chomp $input;
+        if ($fh eq $server) {                  # from server: write to STDOUT
+            say $input;
+        } else {                               # from STDIN: send to server
+            if (send_command(my $result, $server, $input)) {
                 print $result;
                 say "OK";
             } else {

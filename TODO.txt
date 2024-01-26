@@ -265,7 +265,7 @@
 ** TODO `rong cp`
 * DONE Failing a command should result in non-zero exit status
   CLOSED: [2024-01-20 Sat 06:45]
-* [6/13] Make Unicode work (in socket communication)
+* [10/13] Make Unicode work (in socket communication)
   :PROPERTIES:
   :COOKIE_DATA: todo recursive
   :END:
@@ -309,6 +309,23 @@
    avoid hangs.)
 ** DONE Explicitly encode output of all subcommands
    CLOSED: [2024-01-26 Fri 05:29]
+** [4/4] Refactor `server_main()`
+*** DONE Should use `$id` instead of `$fn`
+    CLOSED: [2024-01-26 Fri 06:17]
+*** DONE `rong::initialize()` should be called with $id as arg
+    CLOSED: [2024-01-26 Fri 06:18]
+    That is, there should be a separate line `my $id = fileno($fh)`, and then
+    it should be called with `rong::initialize($id, $listenfile)`
+*** DONE Add error indicator after infinite loop
+    CLOSED: [2024-01-26 Fri 06:19]
+    If something ever breaks out of the infinite loop, that should (at least)
+    print an error in the error log. Add something like the following after the
+    loop in `server_main()`.
+
+        die "THIS CANNOT HAPPEN\n";
+ 
+*** DONE When reading, use same variable name
+    CLOSED: [2024-01-26 Fri 06:32]
 ** TODO Explicitly encode/decode all dirs, filenames and paths
    Look the use of `__FILE__`, operations done with `File::Spec` and `Cwd`.
    Write wrapper functions that makes sure that all of these functions only
@@ -322,19 +339,6 @@
      + Filenames
  
 ** TODO Make sure 2nd arg of `read_input()` is used where needed
-** [0/4] Refactor `server_main()`
-*** TODO Should use `$id` instead of `$fn`
-*** TODO `rong::initialize()` should be called with $id as arg
-    That is, there should be a separate line `my $id = fileno($fh)`, and then
-    it should be called with `rong::initialize($id, $listenfile)`
-*** TODO Add error indicator after infinite loop
-    If something ever breaks out of the infinite loop, that should (at least)
-    print an error in the error log. Add something like the following after the
-    loop in `server_main()`.
-
-        die "THIS CANNOT HAPPEN\n";
- 
-*** TODO When reading, use same variable name
 ** TODO Explicitly encode/decode socket communication
    `sysread()` cannot be used for file handles marked as utf8, meaning that all
     input must be manually decoded.
