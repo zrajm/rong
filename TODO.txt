@@ -268,7 +268,7 @@
    a dir.
 * DONE Failing a command should result in non-zero exit status
   CLOSED: [2024-01-20 Sat 06:45]
-* [14/17] Make Unicode work (in socket communication)
+* [16/16] Make Unicode work (in socket communication)
   :PROPERTIES:
   :COOKIE_DATA: todo recursive
   :END:
@@ -337,7 +337,7 @@
  
 *** DONE When reading, use same variable name
     CLOSED: [2024-01-26 Fri 06:32]
-** [3/5] Explicitly encode/decode all dirs, filenames and paths
+** [5/5] Explicitly encode/decode all dirs, filenames and paths
    Look the use of `__FILE__`, operations done with `File::Spec` and `Cwd`.
    Write wrapper functions that makes sure that all of these functions only
    return strings for which `is_utf8()` returns true.
@@ -347,9 +347,11 @@
     CLOSED: [2024-01-26 Fri 16:07]
 *** DONE Filenames
     CLOSED: [2024-01-28 Sun 16:51]
-*** TODO Tempdir
-*** TODO __FILE__
-** TODO Make sure 2nd arg of `read_input()` is used where needed
+*** DONE __FILE__
+    CLOSED: [2024-01-28 Sun 18:27]
+*** DONE Tempdir
+    CLOSED: [2024-01-28 Sun 18:27]
+* TODO Make sure 2nd arg of `input()` is used where needed
 * [0/5] Make sure the sockets are used correctly
   Read up on sockets: https://docstore.mik.ua/orelly/perl4/cook/ch17_04.htm
 ** TODO Overview

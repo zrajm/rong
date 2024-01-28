@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.48';                         # https://semver.org/
+our $VERSION='0.0.49';                         # https://semver.org/
 our $VERSION_DATE='28 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -47,18 +47,18 @@ Commands:
 If neither COMMAND nor FILE(s) are given, `list` is assumed. If FILE(s) are
 specified but COMMAND is not, then `load` is assumed.
 USAGE_END
+our $PROGRAM = (File::Spec->splitpath(decode(__FILE__)))[2];
 
 ###############################################################################
 # Functions
 
 sub help { print $USAGE; exit 0; }
 sub version {
-    my $program    = (File::Spec->splitpath(__FILE__))[2];
     my ($years)    = $CREATED_DATE =~ m#(\d{4})#;
     my ($end_year) = $VERSION_DATE =~ m#(\d{4})#;
     $years .= "-$end_year" unless $years eq $end_year;
     print(
-        "$program (zrajm utils) $VERSION ($VERSION_DATE)\n",
+        "$PROGRAM (zrajm utils) $VERSION ($VERSION_DATE)\n",
         "Copyright (C) $years $AUTHOR\n",
         "License: GNU GPLv2 <https://gnu.org/licenses/gpl-2.0.txt>.\n",
         "This is free software: You are free to change and redistribute it.\n");
@@ -72,8 +72,7 @@ sub version {
 # parts can change depending on your $TEMPDIR variable, the name of the script
 # and your user's numerical user id). The directory name is the same as Tmux.
 sub create_tempdir {
-    my $program = (File::Spec->splitpath(__FILE__))[2];
-    my $dir = File::Spec->join(File::Spec->tmpdir(), "$program-$<");
+    my $dir = File::Spec->join(rong::tempdir(), "$PROGRAM-$<");
     mkdir($dir, 0700) or die "Cannot create tempdir '$dir': $!\n"
         unless -d $dir;
     return $dir;
@@ -175,6 +174,7 @@ sub start_server {
 
     # Wrappers to decode names from the file system.
     sub rootdir  { main::decode File::Spec->rootdir() }
+    sub tempdir  { main::decode File::Spec->tmpdir() }
     sub workdir  { main::decode Cwd::getcwd() }
     sub realpath { main::decode Cwd::realpath(@_) }
 
@@ -315,10 +315,9 @@ sub start_server {
 
     sub initialize {
         my ($id, $listenfile) = (@_);
-        my $program = (File::Spec->splitpath(__FILE__))[2];
         $opt{$id} = { pwd => rootdir() };
         warn "(client $id connected, path '$opt{$id}{pwd}')\n";
-        main::output "OK $program $VERSION $listenfile\n";
+        main::output "OK $PROGRAM $VERSION $listenfile\n";
     }
 
     sub terminate {
@@ -404,10 +403,9 @@ sub send_command(\$$$) {
 
 local $SIG{__DIE__} = sub {
     die @_ if $^S;                             # abort if called inside eval
-    my $program = (File::Spec->splitpath(__FILE__))[2];
     my $more = (my $msg = "@_") =~ s/[.]$//;   # ending in '.' = extra help
-    die("$program: $msg",
-        $more && "Try '$program --help' for more information.\n");
+    die("$PROGRAM: $msg",
+        $more && "Try '$PROGRAM --help' for more information.\n");
 };
 
 my $tempdir = create_tempdir();
@@ -456,7 +454,6 @@ my $cmd = do {
 if ($cmd ne 'repl') {
     my $err;
     my $more;
-    my $program = (File::Spec->splitpath(__FILE__))[2];
     for my $arg (@arg ? @arg : undef) {
         my $cmdstr = rong::serialize($cmd, $arg // ());
         if (send_command(my $result, $server, $cmdstr)) {
@@ -465,10 +462,10 @@ if ($cmd ne 'repl') {
             chomp(my $msg = $@);
             $err  = 1;
             $more = 1 if $msg =~ s/[.]$//;     # ending in '.' = extra help
-            warn "$program: $msg\n";
+            warn "$PROGRAM: $msg\n";
         }
     }
-    warn "Try '$program --help' for more information.\n" if $more;
+    warn "Try '$PROGRAM --help' for more information.\n" if $more;
     exit($err ? 127 : 0);
 }
 
