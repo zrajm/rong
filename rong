@@ -2,6 +2,11 @@
 # Copyright (C) 2023-2024 zrajm <rong@zrajm.org>
 # License: GPLv2 [https://gnu.org/licenses/gpl-2.0.txt]
 
+# NOTE ON UTF8: The `use open` only deals with SOME input streams. Encoding and
+# decoding has to be done manually for: Client's STDIN in REPL mode + all
+# sockets + command line args + paths gotten from the file system + environment
+# variables (%ENV) + Perl constants (e.g. `__FILE__`). STDIN, STDERR
+
 # https://perl.com/pub/2012/04/perlunicook-standard-preamble.html
 use utf8;      # so literals and identifiers can be in UTF-8
 use v5.12;     # or later to get "unicode_strings" feature
@@ -15,12 +20,11 @@ use IO::Socket;
 use IO::Select;
 use POSIX;
 use File::Spec;
-use Cwd;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.47';                         # https://semver.org/
-our $VERSION_DATE='26 January 2024';
+our $VERSION='0.0.48';                         # https://semver.org/
+our $VERSION_DATE='28 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -140,7 +144,7 @@ sub start_server {
         defined(my $server_pid = fork) or die "Cannot fork server: $!\n";
         if ($server_pid == 0) {                # in server
             $0 .= ' --daemon';                 #   server process name
-            my $root = File::Spec->rootdir();
+            my $root = rong::rootdir();
             umask(0) or die "Cannot change umask to '0': $!\n";
             chdir($root) or die "Cannot change dir to '$root': $!\n";
             close STDOUT;
@@ -161,11 +165,18 @@ sub start_server {
 
 {
     package rong;
+
     use sigtrap qw/handler exithandler normal-signals/;
+    use Cwd ();
 
     sub exithandler {
         warn "(server exited)\n" unless -t STDERR;
     }
+
+    # Wrappers to decode names from the file system.
+    sub rootdir  { main::decode File::Spec->rootdir() }
+    sub workdir  { main::decode Cwd::getcwd() }
+    sub realpath { main::decode Cwd::realpath(@_) }
 
     ###########################################################################
     ## Internal functions, called inside eval, use die() to indicate error
@@ -194,18 +205,20 @@ sub start_server {
         close($fh) or die "Cannot close file: $!\n";
     }
 
+    # Using `decode()` isn't needed for `abspath()` and `relpath()`,
+    # since if both args are in utf8, then the result is, too.
     sub abspath {
         my ($path, $base) = @_;
         $path =~ s#^~[^/]*# glob("'$&'") #e;
         $path = File::Spec->join($base, $path)
             unless File::Spec->file_name_is_absolute($path);
-        $path = Cwd::realpath($path) or die "Cannot find absolute path: $!\n";
+        $path = realpath($path) or die "Cannot find absolute path: $!\n";
         return $path;
     }
 
     sub relpath {
         my ($path, $base) = @_;
-        return $base eq File::Spec->rootdir()
+        return $base eq rootdir()
             ? $path : File::Spec->abs2rel($path, $base);
     }
 
@@ -303,7 +316,7 @@ sub start_server {
     sub initialize {
         my ($id, $listenfile) = (@_);
         my $program = (File::Spec->splitpath(__FILE__))[2];
-        $opt{$id} = { pwd => File::Spec->rootdir() };
+        $opt{$id} = { pwd => rootdir() };
         warn "(client $id connected, path '$opt{$id}{pwd}')\n";
         main::output "OK $program $VERSION $listenfile\n";
     }
@@ -428,7 +441,7 @@ if ($sockets->can_read) {
 }
 
 send_command(my $result, $server, rong::serialize(
-    'cd', Cwd::getcwd() // File::Spec->rootdir()
+    'cd', rong::workdir() // rong::rootdir(),
 )) or warn "Cannot change dir: $@";
 
 # Get subcommand from command line.

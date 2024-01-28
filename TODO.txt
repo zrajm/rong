@@ -216,7 +216,7 @@
   CLOSED: [2024-01-18 Thu 04:11]
 * DONE Empty arg to `escape()` should return ""
   CLOSED: [2024-01-18 Thu 22:22]
-* [11/15] Improve subcommands
+* [11/16] Improve subcommands
 ** DONE Subcommand functions should not be in hash
    CLOSED: [2024-01-19 Fri 22:35]
 ** DONE `rong` (without args) should start server + list buffers
@@ -263,9 +263,12 @@
    will be at the end of the last line. How do other protocols handle this?
 ** TODO `rong mv`
 ** TODO `rong cp`
+** TODO `rong cd` -- error message(s)
+   Decent error message for when dir can't be created because exists, but isn't
+   a dir.
 * DONE Failing a command should result in non-zero exit status
   CLOSED: [2024-01-20 Sat 06:45]
-* [10/13] Make Unicode work (in socket communication)
+* [14/17] Make Unicode work (in socket communication)
   :PROPERTIES:
   :COOKIE_DATA: todo recursive
   :END:
@@ -282,8 +285,11 @@
    CLOSED: [2024-01-25 Thu 11:50]
 ** DONE Explicitly decode command line arguments
    CLOSED: [2024-01-26 Fri 01:39]
-** DONE Use `sysread()` for all input (sockets and STDIN)
+** DONE Explicitly encode/decode socket communication (and STDIN)
    CLOSED: [2024-01-26 Fri 02:30]
+   `sysread()` cannot be used for file handles marked as utf8, meaning that all
+    input must be manually decoded.
+
    Since all sockets use `sysread()`, also read STDIN using `sysread()` (as
    this simplifies code). `sysread()` cannot be used in input marked as utf8,
    so therefore STDIN needs to be set to `:raw` mode using `binmode(STDIN,
@@ -309,6 +315,11 @@
    avoid hangs.)
 ** DONE Explicitly encode output of all subcommands
    CLOSED: [2024-01-26 Fri 05:29]
+** DONE Use `syswrite()` when writing to socket
+   CLOSED: [2024-01-26 Fri 06:12]
+   Were using `sysread()` to read from socket, and this instruction should not
+   be mixed with the likes of `print()` -- which is used for buffered IO. Thus
+   `syswrite()` must be used.
 ** [4/4] Refactor `server_main()`
 *** DONE Should use `$id` instead of `$fn`
     CLOSED: [2024-01-26 Fri 06:17]
@@ -326,22 +337,19 @@
  
 *** DONE When reading, use same variable name
     CLOSED: [2024-01-26 Fri 06:32]
-** TODO Explicitly encode/decode all dirs, filenames and paths
+** [3/5] Explicitly encode/decode all dirs, filenames and paths
    Look the use of `__FILE__`, operations done with `File::Spec` and `Cwd`.
    Write wrapper functions that makes sure that all of these functions only
    return strings for which `is_utf8()` returns true.
-
-   Unicode should work in:
-
-     + Current dir
-     + Tempdir
-     + __FILE__
-     + Filenames
- 
+*** DONE Current dir
+    CLOSED: [2024-01-26 Fri 16:07]
+*** DONE Root dir
+    CLOSED: [2024-01-26 Fri 16:07]
+*** DONE Filenames
+    CLOSED: [2024-01-28 Sun 16:51]
+*** TODO Tempdir
+*** TODO __FILE__
 ** TODO Make sure 2nd arg of `read_input()` is used where needed
-** TODO Explicitly encode/decode socket communication
-   `sysread()` cannot be used for file handles marked as utf8, meaning that all
-    input must be manually decoded.
 * [0/5] Make sure the sockets are used correctly
   Read up on sockets: https://docstore.mik.ua/orelly/perl4/cook/ch17_04.htm
 ** TODO Overview
