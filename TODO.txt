@@ -216,7 +216,7 @@
   CLOSED: [2024-01-18 Thu 04:11]
 * DONE Empty arg to `escape()` should return ""
   CLOSED: [2024-01-18 Thu 22:22]
-* [11/16] Improve subcommands
+* [12/16] Improve subcommands
 ** DONE Subcommand functions should not be in hash
    CLOSED: [2024-01-19 Fri 22:35]
 ** DONE `rong` (without args) should start server + list buffers
@@ -256,6 +256,10 @@
 ** DONE `rong save` -- Handle write errors
    CLOSED: [2024-01-20 Sat 05:12]
    Should any catch errors gotten while writing (in `print` statement) too.
+** DONE `rong cd` -- error message(s)
+   CLOSED: [2024-01-28 Sun 18:50]
+   Decent error message for when dir can't be created because exists, but isn't
+   a dir.
 ** TODO `rong save` -- Make atomic
 ** TODO `rong cat` -- with no trailing newline
    If the file doesn't end in a newline, then newline should be added. This
@@ -263,9 +267,6 @@
    will be at the end of the last line. How do other protocols handle this?
 ** TODO `rong mv`
 ** TODO `rong cp`
-** TODO `rong cd` -- error message(s)
-   Decent error message for when dir can't be created because exists, but isn't
-   a dir.
 * DONE Failing a command should result in non-zero exit status
   CLOSED: [2024-01-20 Sat 06:45]
 * [16/16] Make Unicode work (in socket communication)

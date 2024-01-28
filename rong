@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.49';                         # https://semver.org/
+our $VERSION='0.0.50';                         # https://semver.org/
 our $VERSION_DATE='28 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -239,7 +239,8 @@ sub start_server {
         my ($id, $dir) = @_;
         if (defined $dir) {
             my $newdir = abspath($dir, $opt{$id}{pwd});
-            die "Directory does not exist\n" unless -d $newdir;
+            die "Directory does not exist\n" unless -e $newdir;
+            die "File is not a directory\n" unless -d $newdir;
             $opt{$id}{pwd} = $newdir;
         }
         main::output "$opt{$id}{pwd}\n";
