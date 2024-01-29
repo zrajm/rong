@@ -345,8 +345,9 @@
     CLOSED: [2024-01-28 Sun 18:27]
 *** DONE Tempdir
     CLOSED: [2024-01-28 Sun 18:27]
+* DONE Fix `THIS CANNOT HAPPEN` warning when server receives SIGTERM
+  CLOSED: [2024-01-29 Mon 18:46]
 * TODO Make sure 2nd arg of `input()` is used where needed
-* TODO Fix `THIS CANNOT HAPPEN` warning when server receives SIGTERM
 * [0/4] Improve log
 ** TODO Log each invoked command
 ** TODO Don't include path for each log event

@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.50';                         # https://semver.org/
-our $VERSION_DATE='28 January 2024';
+our $VERSION='0.0.51';                         # https://semver.org/
+our $VERSION_DATE='29 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -165,13 +165,7 @@ sub start_server {
 
 {
     package rong;
-
-    use sigtrap qw/handler exithandler normal-signals/;
     use Cwd ();
-
-    sub exithandler {
-        warn "(server exited)\n" unless -t STDERR;
-    }
 
     # Wrappers to decode names from the file system.
     sub rootdir  { main::decode File::Spec->rootdir() }
@@ -348,7 +342,11 @@ sub start_server {
 
 sub server_main {
     my ($listenfh, $listenfile) = @_;
+    local $SIG{__DIE__} = 'DEFAULT';
+    local $SIG{PIPE} = local $SIG{HUP} = 'IGNORE';
+    local $SIG{TERM} = local $SIG{INT} = sub { die "(server exited)\n" };
     warn "(server started)\n";
+
     my $sockets = IO::Select->new($listenfh);
     while (my @ready = $sockets->can_read) {
         foreach my $fh (@ready) {
