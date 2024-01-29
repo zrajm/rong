@@ -102,6 +102,7 @@ sub input {
         decode($raw) or die("Cannot decode string from $src: $@");
     };
 }
+# Used for writing to socket.
 sub output { syswrite select(), encode join('', @_) }
 
 sub make_socket {

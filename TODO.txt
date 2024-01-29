@@ -216,7 +216,7 @@
   CLOSED: [2024-01-18 Thu 04:11]
 * DONE Empty arg to `escape()` should return ""
   CLOSED: [2024-01-18 Thu 22:22]
-* [12/16] Improve subcommands
+* [12/12] Improve subcommands
 ** DONE Subcommand functions should not be in hash
    CLOSED: [2024-01-19 Fri 22:35]
 ** DONE `rong` (without args) should start server + list buffers
@@ -260,13 +260,6 @@
    CLOSED: [2024-01-28 Sun 18:50]
    Decent error message for when dir can't be created because exists, but isn't
    a dir.
-** TODO `rong save` -- Make atomic
-** TODO `rong cat` -- with no trailing newline
-   If the file doesn't end in a newline, then newline should be added. This
-   requires different schema for the OK/ERR message, as the OK/ERR no longer
-   will be at the end of the last line. How do other protocols handle this?
-** TODO `rong mv`
-** TODO `rong cp`
 * DONE Failing a command should result in non-zero exit status
   CLOSED: [2024-01-20 Sat 06:45]
 * [16/16] Make Unicode work (in socket communication)
@@ -353,6 +346,60 @@
 *** DONE Tempdir
     CLOSED: [2024-01-28 Sun 18:27]
 * TODO Make sure 2nd arg of `input()` is used where needed
+* TODO Fix `THIS CANNOT HAPPEN` warning when server receives SIGTERM
+* [0/4] Improve log
+** TODO Log each invoked command
+** TODO Don't include path for each log event
+** TODO More unique non-repeating client id?
+   Meaning commands can be tied to a specific client connection, and other
+   commands of that client connection can be easily located.q
+** TODO Time for each logged event
+* [0/2] Search/replace (1st editing capability)
+** TODO Search/replace
+** TODO Undo
+* [0/3] Atomic saves + `rename` & `copy`
+** TODO `rong save` -- Make atomic
+   There should maybe be a `--no-atomic` option to override atomic saves
+   (useful for situation with very full disk, where one just wants to override
+   the old data).
+** TODO `rong rename`
+** TODO `rong copy`
+* [0/3] Multi-line responses over the socket
+** TODO A standardized format for multi-line responses
+   The socket protocol should allow for multi-line output from the server. This
+   requires a change in the trailing OK/ERR message, as the OK/ERR is no longer
+   at the beginning of the last line when the final line outputted by `rong
+   cat` does not end in a newline.
+
+   How do other line-based protocols deal with this?
+
+   This would be used by the `rong cat` and `rong help` commands. For `rong
+   cat` it might also be less resource consuming to output a buffer (in
+   `cmd_cat()`) line-by-line:
+
+        main::output $_ foreach @{$buf{$file}};
+
+   Instead of just as a single concatenated string, as is done now:
+
+        main::output @{$buf{$file}};
+
+   Right now, the `foreach` approach doesn't work, as the client only
+   `sysread()` a single chunk (1024 * 1024 bytes). But with a change in
+   protocol, the client could do repeated reads until eof is reached.
+** TODO `rong cat` -- Output files without final newline
+   Doing `rong cat` respect any lack of a newline at the end of the file. That
+   is, if a file is loaded, then outputted by means of `rong cat`, the
+   outputted text should be identical to the original file.
+** TODO `rong help` -- Detailed help info
+   The detailed help info should provide the same info about the commands as is
+   available from the command line using the `--help` option. (In fact, the
+   `--help` option should fetch *its* help info from the server process, so as
+   to make the client server-version agnostic.)
+
+   The help output is this mode should preferably be the same as with command
+   line help, e.g. `rong help load` should show the same text as `help load` in
+   REPL-mode, and `rong help` and `rong --help` should show the same as `help`
+   in REPL mode.
 * [0/5] Make sure the sockets are used correctly
   Read up on sockets: https://docstore.mik.ua/orelly/perl4/cook/ch17_04.htm
 ** TODO Overview
@@ -416,15 +463,6 @@
        }
  
 * [0/8] Protocol
-** TODO Format: Multi-line server response? (for interactive `help` command)
-   I want the server to be able to talk to a user for exploratory purposes.
-   Thus there should always be REPL-mode, and it should have a `help` command.
-   For this to work server needs to be able to respond with multi-line output,
-   what should this look like? (How do other protocols do this?)
-
-   The help output is this mode should preferably be the same as with command
-   line help, e.g. `rong help load` should show the same text as `help load` in
-   REPL-mode.
 ** TODO Format: Raw mode? (for visual editor clients)
    Telnet protocol apparently have a line-based and a raw mode. How does that
    work?
@@ -439,12 +477,23 @@
 ** TODO Separate protocol logic from server specifics
    The client and server skeleton logic should be in a separate module, and the
    specifics should be separated out into its own module.
-* TODO File fingerprinting & checksumming
-** TODO `rong load` -- Avoid useless reloads
+* [0/4] Change-based Load/save
+** TODO Implement file fingerprinting
+   When loading a file ctime and a file fingerprint should also be remembered,
+   then used for intelligently deciding when to save, or reload a file.
+** TODO `rong load` -- Reload if file has changed (and buffer hasn't)
+   When doing `rong load FILE` on an already loaded file, don't display error
+   message:
+
+       rong: Command 'load': File already loaded
+
+   But instead check to see if file has been modified on disk, and if it has
+   reload it.
+
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be reloaded.
    (Instead a message should be given to the user.)
-** TODO `rong save` -- Avoid useless resaves
+** TODO `rong save` -- Save if buffer has changed (but file hasn't)
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
