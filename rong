@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.51';                         # https://semver.org/
-our $VERSION_DATE='29 January 2024';
+our $VERSION='0.0.52';                         # https://semver.org/
+our $VERSION_DATE='30 January 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -313,7 +313,8 @@ sub start_server {
         my ($id, $listenfile) = (@_);
         $opt{$id} = { pwd => rootdir() };
         warn "(client $id connected, path '$opt{$id}{pwd}')\n";
-        main::output "OK $PROGRAM $VERSION $listenfile\n";
+        main::output "OK $PROGRAM v$VERSION " .
+              "-- Use ^D to exit, or 'help' for info.\n";
     }
 
     sub terminate {
@@ -432,10 +433,11 @@ my $greeting;
 if ($sockets->can_read) {
     $greeting = input($server)
         // die "Cannot read server greeting: " . ($@ // "Server exited\n");
-    die "Cannot understand server greeting\n",
-        "    expected: OK rong #.#.# $socket\n",
-        "    but got : $greeting"
-        unless $greeting =~ /^OK rong \d+\.\d+\.\d+ \Q$socket\E$/;
+    chomp $greeting;
+    die "Unrecognized server greeting\n",
+        "    expected: 'OK rong v{VERSION} -- {MESSAGE}'\n",
+        "    but got : '$greeting'\n"
+        unless $greeting =~ /^OK rong v\d+\.\d+\.\d+\b/;
 }
 
 send_command(my $result, $server, rong::serialize(
@@ -471,7 +473,7 @@ if ($cmd ne 'repl') {
 
 # Client: Wait until there's input from either STDIN or $server.
 die "Too many arguments.\n" if @arg;
-print $greeting;
+say $greeting;
 binmode(STDIN, ':raw');
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {

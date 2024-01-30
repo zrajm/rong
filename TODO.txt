@@ -498,7 +498,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [4/8] Improve error messages & help
+* [5/9] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -534,23 +534,27 @@
    CLOSED: [2024-01-19 Fri 20:14]
 ** DONE Make error messages more user friendly
    CLOSED: [2024-01-20 Sat 08:15]
-  When invoking command from the command line, like so
+   When invoking command from the command line, like so
 
-      $ rong list osuh
-      rong list osuh: No args allowed
+       $ rong list osuh
+       rong list osuh: No args allowed
 
-  The error message should more similar to when an incorrect option was given:
+   The error message should more similar to when an incorrect option was given:
 
-      $ rong --osuhou
-      rong: Unrecognized option '--osuhou'
-      Try 'rong help' for more information.
+       $ rong --osuhou
+       rong: Unrecognized option '--osuhou'
+       Try 'rong help' for more information.
 
-  Something more like this:
+   Something more like this:
 
-      $ rong list osuh
-      rong list "osuh": No args allowed
-      Try 'rong help list' for more information.
+       $ rong list osuh
+       rong list "osuh": No args allowed
+       Try 'rong help list' for more information.
  
+** DONE More pedagogical server greeting
+   CLOSED: [2024-01-30 Tue 11:31]
+   When user connect in REPL mode, the server greeting should indicate that ^D
+   is used to quit, and that `help` can be used for additional info.
 ** TODO Fetch help info from server
    The command information should be read from the server, so that the REPL
    will show the same help info as the command line client.
