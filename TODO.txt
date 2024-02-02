@@ -498,7 +498,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [5/9] Improve error messages & help
+* [6/10] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -555,6 +555,20 @@
    CLOSED: [2024-01-30 Tue 11:31]
    When user connect in REPL mode, the server greeting should indicate that ^D
    is used to quit, and that `help` can be used for additional info.
+** DONE Make client server-version agnostic
+   CLOSED: [2024-02-02 Fri 14:11]
+   The client needs a list of available commands from the server in order to
+   parse the command line. To decouple the client and server completely, the
+   client should ask the server for the available commands and use this info to
+   parse the command line.
+
+   There's gonna be a variable number of arguments for different server
+   commands. Some will only ever take one arg ('load', 'save' etc.) some zero
+   or one ('cd'), some two ('mv', 'cp' -- moar?).
+
+   Rather than doing complicated tricks here, just give the entire command line
+   to the server (minus any leading options intended for the Rong client), and
+   let the server deal with it, returning any appropriate errors.
 ** TODO Fetch help info from server
    The command information should be read from the server, so that the REPL
    will show the same help info as the command line client.

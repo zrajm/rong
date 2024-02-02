@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.52';                         # https://semver.org/
-our $VERSION_DATE='30 January 2024';
+our $VERSION='0.0.53';                         # https://semver.org/
+our $VERSION_DATE='2 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -286,7 +286,7 @@ sub start_server {
         my @x = m/\G( "(?:[^"\\]|\\.)*" |      # double quoted
                       '(?:[^'\\]|\\.)*' |      # single quoted
                       [^[:cntrl:][:space:]"']+ # other words
-                  )(?:\h+|$)/gxc;
+                  )(?:\h+|\n?\z)/gxc;
         die "Cannot deserialize string\n" if pos != length;
         return map { unescape($_) } @x;
     }
@@ -446,7 +446,9 @@ send_command(my $result, $server, rong::serialize(
 
 # Get subcommand from command line.
 my $cmd = do {
-    my %cmds = map { $_ => 1 } (rong::subcommands(), 'repl');
+    send_command(my $cmds, $server, rong::serialize('help'))
+        or die "Cannot read available commands from Rong server\n";
+    my %cmds = map { $_ => 1 } (rong::deserialize($cmds), 'repl');
     @arg == 0           ? 'list' :             # no args
         !$cmds{$arg[0]} ? 'load'               # only filenames given
                         : shift(@arg);         # 1st arg is subcommand
