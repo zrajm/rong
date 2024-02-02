@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.55';                         # https://semver.org/
+our $VERSION='0.0.56';                         # https://semver.org/
 our $VERSION_DATE='2 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -384,7 +384,7 @@ sub send_command(\$$$) {
     my ($reply, $fh, $cmdstr) = @_;
     my $sockets = IO::Select->new($fh);
     if ($sockets->can_write) {                 # send command to server
-        syswrite $fh, encode $cmdstr;
+        syswrite $fh, encode "$cmdstr\n";
     }
     if ($sockets->can_read) {                  # read server response
         $$reply = eval {
