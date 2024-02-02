@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.53';                         # https://semver.org/
+our $VERSION='0.0.54';                         # https://semver.org/
 our $VERSION_DATE='2 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -287,7 +287,8 @@ sub start_server {
                       '(?:[^'\\]|\\.)*' |      # single quoted
                       [^[:cntrl:][:space:]"']+ # other words
                   )(?:\h+|\n?\z)/gxc;
-        die "Cannot deserialize string\n" if pos != length;
+        die "Cannot deserialize string\n"
+            unless defined(pos) and pos == length;
         return map { unescape($_) } @x;
     }
     sub unescape {
@@ -306,7 +307,7 @@ sub start_server {
         my %c = ("\a"=>'\a', "\b"=>'\b', "\e"=>'\e',  "\f"=>'\f', "\n"=>'\n',
                  "\r"=>'\r', "\t"=>'\t', "\\"=>'\\\\','"' =>'\"', "'" =>"\\'");
         return s# [[:cntrl:]\\"] # $c{$&} // sprintf('\\x%02X', ord $&) #gex
-            || /^$/ || / / ? "\"$_\"" : $_;    # if empty or has space/escape
+            || /^$/ || /\h/ ? "\"$_\"" : $_;   # if empty or has space/escape
     }
 
     sub initialize {
