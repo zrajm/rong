@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.54';                         # https://semver.org/
+our $VERSION='0.0.55';                         # https://semver.org/
 our $VERSION_DATE='2 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -450,9 +450,13 @@ my $cmd = do {
     send_command(my $cmds, $server, rong::serialize('help'))
         or die "Cannot read available commands from Rong server\n";
     my %cmds = map { $_ => 1 } (rong::deserialize($cmds), 'repl');
-    @arg == 0           ? 'list' :             # no args
-        !$cmds{$arg[0]} ? 'load'               # only filenames given
-                        : shift(@arg);         # 1st arg is subcommand
+    local $_ = $arg[0];
+    @arg == 0                  ? 'list'      : # no args
+        $cmds{$_}              ? shift(@arg) : # is a command
+        /[^a-z]/               ? 'load'      : # has a non-alpha char
+        -l $_                  ? 'load'      : # is (possibly dangling) symlink
+        -f $_                  ? 'load'      : # is existing file
+                                 shift(@arg);
 };
 
 # Repeat command for each arg (but send one command if no args).
