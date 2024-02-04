@@ -347,7 +347,25 @@
     CLOSED: [2024-01-28 Sun 18:27]
 * DONE Fix `THIS CANNOT HAPPEN` warning when server receives SIGTERM
   CLOSED: [2024-01-29 Mon 18:46]
+* DONE Accept standard server signals (SIGHUP, SIGINT etc)
+  CLOSED: [2024-01-29 Mon 18:47]
+
+  SIGPIPE is received when client disconnects, and needs to be ignored. SIGHUP
+  might be received upon backgrounding the server. SIGTERM and SIGINT both
+  exits the server.
 * TODO Make sure 2nd arg of `input()` is used where needed
+* [0/1] `rong select`
+  Should be able to select files, and section of files. Any subsequent
+  operations would then be performed on the selection only.
+** TODO `rong select [FILE][:(LINE[.COL][..LINE2[.COL2]]|NAME)]`
+   Select FILE or part of FILE. If `LINE` or `LINE..LINE2` is given, select the
+   corresponding lines (with COL specifying the column, and negative numbers
+   counting backwards from the end). If NAME is given, select the function
+   called NAME (from the name of the function to the end of it).
+
+   `NAME` supports functions in: C, Javascript, Perl, Python and the Shell.
+   (Javascript also allows for the `NAME = function (...) {...}` and
+   `NAME = (...) => { ... }` form.)
 * [0/4] Improve log
 ** TODO Log each invoked command
 ** TODO Don't include path for each log event
@@ -355,9 +373,57 @@
    Meaning commands can be tied to a specific client connection, and other
    commands of that client connection can be easily located.q
 ** TODO Time for each logged event
-* [0/2] Search/replace (1st editing capability)
-** TODO Search/replace
+* [0/5] Search/replace (1st editing capability)
+** TODO Allow multiple args in `invoke()`
+   In order to make a command with multiple arguments work, a rewrite of
+   `invoke()` function is needed, so that a command line only ever invokes one
+   `cmd_` function, rather than invoke one command for each file.
+
+   This means that the error message must contain the name of the file related
+   to the error.
+** TODO Include name of file in error messages
+** TODO `rong replace PATTERN REPLACEMENT`
 ** TODO Undo
+
+   + Never lose redo history: Editing after undoing should not lose the redo
+     history. (Similar to the way Emacs does this.) Edit history should be in
+     the shape of a tree.
+
+   + Separate undo histories for separate views: If two views of the same file
+     is open, they should not affect each other. Undoing a change, should not
+     undo a change done in a different view.
+
+   + Selective undo: User should be able to select an area, then perform undo
+     to only the changes made in this area.
+
+   There should be a history viewer, where one can:
+   + Look at the complete history (all views, all changes) with the changes
+     belonging to the current view highlighted.
+   + Look at the history for only this view (excluding any other changes).
+   + Look at changes being done in a specific time interval.
+
+   When reloading a file: Find the differences with the old version, and
+   incorporate this as an undoable action in the file's edit history.
+
+   What structure to use?
+
+   + [[https://github.com/zaboople/klonk/blob/master/TheGURQ.md][Resolving the Great Undo-Redo Quandary (GURQ)]] -- This article describes
+     the UI of something that works like Emacs undo function. (Can we do better
+     than this?)
+
+   To quote https://news.ycombinator.com/item?id=33561897:
+
+       In Emacs, undo makes an undo pointer go down in the undo stack. Pressing
+       undo again goes back another step. If you do any other regular edit, the
+       pointer starts over at the top of the undo stack. Undo puts its own
+       edits on top of the stack like any other command.
+
+       So if you "undo, undo" you undo two things. If you "undo, edit, undo",
+       you're keeping the first undo but reverse the edit. If you "undo, edit,
+       undo, undo", you're back to where you started (except your undo stack
+       has now grown).
+ 
+** TODO Diffing the undo
 * [0/3] Atomic saves + `rename` & `copy`
 ** TODO `rong save` -- Make atomic
    There should maybe be a `--no-atomic` option to override atomic saves
@@ -365,32 +431,44 @@
    the old data).
 ** TODO `rong rename`
 ** TODO `rong copy`
-* [0/3] Multi-line responses over the socket
-** TODO A standardized format for multi-line responses
-   The socket protocol should allow for multi-line output from the server. This
-   requires a change in the trailing OK/ERR message, as the OK/ERR is no longer
-   at the beginning of the last line when the final line outputted by `rong
-   cat` does not end in a newline.
+* [2/6] Multi-line responses over the socket
+** DONE Create and document multi-line protocol responses
+   CLOSED: [2024-02-02 Fri 13:48]
+   Added "Protocol" section to the README.
+** DONE A standardized format for multi-line responses
+   CLOSED: [2024-02-04 Sun 23:24]
+   Implemented a scheme for multi-line server responses. Documented in the
+   `README.md` under the heading 'Protocol'.
 
-   How do other line-based protocols deal with this?
+   The `perlipc` manpage says:
 
-   This would be used by the `rong cat` and `rong help` commands. For `rong
-   cat` it might also be less resource consuming to output a buffer (in
-   `cmd_cat()`) line-by-line:
+       If you're not writing a server/client for an existing protocol like NNTP
+       or SMTP, you should give some thought to how your server will know when
+       the client has finished talking, and vice-versa. Most protocols are
+       based on one-line messages and responses (so one party knows the other
+       has finished when a "\n" is received) or multi-line messages and
+       responses that end with a period on an empty line ("\n.\n" terminates a
+       message/response).
+
+   Furthermore, the escaping of any periods are done by the client adding a
+   leading period to any line starting with a period, and the server then
+   stripping leading periods off of lines which consist of more than just a
+   single period. (RFC2821, chapter "4.5.2 Transparency"
+   https://www.ietf.org/rfc/rfc2821.txt)
+** TODO Make `output()` more helpful
+   `output()` should add 'OK' (or 'ERR') prefix, as well automatically handle
+   single, or multi-line output. Should maybe also be able to output in a loop?
 
         main::output $_ foreach @{$buf{$file}};
-
-   Instead of just as a single concatenated string, as is done now:
-
-        main::output @{$buf{$file}};
-
-   Right now, the `foreach` approach doesn't work, as the client only
-   `sysread()` a single chunk (1024 * 1024 bytes). But with a change in
-   protocol, the client could do repeated reads until eof is reached.
+ 
 ** TODO `rong cat` -- Output files without final newline
    Doing `rong cat` respect any lack of a newline at the end of the file. That
    is, if a file is loaded, then outputted by means of `rong cat`, the
    outputted text should be identical to the original file.
+** TODO Formalize escapes in protocol
+   Server and client should speak in the same way. Does the client->server
+   escaping/unescaping still make sense? Should client messages use multi-line
+   messages that look the same as those coming from server?
 ** TODO `rong help` -- Detailed help info
    The detailed help info should provide the same info about the commands as is
    available from the command line using the `--help` option. (In fact, the
@@ -601,42 +679,6 @@
        $ rong list ga
        rong list ga: No args allowed
  
-* TODO Accept standard server signals (SIGHUP, SIGINT etc)
-  Resist SIGTERM! This is so that `pkill rong` kills client processes but not
-  the server.
-
-  From: https://docstore.mik.ua/orelly/perl/cookbook/ch16_01.htm
-
-  SIGINT: is normally triggered by Ctrl-C. This requests that a process
-    interrupt what it's doing. Simple programs like filters usually just die,
-    but more important ones like shells, editors, or FTP programs usually use
-    SIGINT to stop long-running operations so you can tell them to do something
-    else.
-
-  SIGQUIT: is also normally generated by a terminal, usually Ctrl-\. Its
-    default behavior is to generate a core dump.
-
-  SIGTERM: is sent by the kill shell command when no signal name is explicitly
-    given. Think of it as a polite request for a process to die. SIGUSR1 and
-
-  SIGUSR2: are never caused by system events, so user applications can safely
-    use them for their own purposes.
-
-  SIGPIPE: is sent by the kernel when your process tries to write to a pipe or
-    socket when the process on the other end has closed its connection, usually
-    because it no longer exists.
-
-  SIGALRM: is sent when the timer set by the alarm function expires, as
-    described in Recipe 16.21.
-
-  SIGHUP: is sent to a process when its controlling terminal gets a hang-up
-    (e.g., the modem lost its carrier), but it also often indicates that a
-    program should restart or reread its configuration.
-
-  SIGCHLD: is probably the most important signal when it comes to low-level
-    systems programming. The system sends your process a SIGCHLD when one of
-    its child processes stops running - or, more likely, when that child exits.
-    See Recipe 16.19 for more on SIGCHLD.
 * TODO `rong list` option to display absolute paths
 * TODO All clients should die (immediately) if server dies
   Maybe temporarily add a die command to test this on the server side?
@@ -652,8 +694,49 @@
 * TODO Command to check if server is running (without starting it)
 * TODO Escaping should use same schema as shell or 'ls' command
   To make it make when using `rong list`.
-* [0/8] FAR-FLUNG FUTURE FEATURES
+* [0/12] FAR-FLUNG FUTURE FEATURES
+** TODO Suppress build-in warnings from `syswrite()`
+   `syswrite()` write warnings to STDERR if there's an error (e.g. writing on a
+   closed filehandle). This should instead be handled our own error messages,
+   with the build-in warnings suppressed. However, these errors should be rare
+   enough that it's not a high priority.
 ** TODO If socket file is deleted, should server re-create it(?)
+** TODO Better server signal handling?
+   Resist SIGTERM! This is so that `pkill rong` kills client processes but not
+   the server.
+
+   From: https://docstore.mik.ua/orelly/perl/cookbook/ch16_01.htm
+
+   SIGINT: is normally triggered by Ctrl-C. This requests that a process
+     interrupt what it's doing. Simple programs like filters usually just die,
+     but more important ones like shells, editors, or FTP programs usually use
+     SIGINT to stop long-running operations so you can tell them to do
+     something else.
+
+   SIGQUIT: is also normally generated by a terminal, usually Ctrl-\. Its
+     default behavior is to generate a core dump.
+
+   SIGTERM: is sent by the kill shell command when no signal name is explicitly
+     given. Think of it as a polite request for a process to die. SIGUSR1 and
+
+   SIGUSR2: are never caused by system events, so user applications can safely
+     use them for their own purposes.
+
+   SIGPIPE: is sent by the kernel when your process tries to write to a pipe or
+     socket when the process on the other end has closed its connection,
+     usually because it no longer exists.
+
+   SIGALRM: is sent when the timer set by the alarm function expires, as
+     described in Recipe 16.21.
+
+   SIGHUP: is sent to a process when its controlling terminal gets a hang-up
+     (e.g., the modem lost its carrier), but it also often indicates that a
+     program should restart or reread its configuration.
+
+   SIGCHLD: is probably the most important signal when it comes to low-level
+     systems programming. The system sends your process a SIGCHLD when one of
+     its child processes stops running - or, more likely, when that child
+     exits. See Recipe 16.19 for more on SIGCHLD.
 ** TODO Use `shutdown()` to close socket?
    https://docstore.mik.ua/orelly/perl/cookbook/ch17_10.htm
 ** TODO On startup make sure any existing tempdir is chmod 0700
@@ -675,22 +758,29 @@
 ** TODO Change client directory to root
    Clients should remember their starting directory, but change dir to '/' so
    that their original dir can be unmounted etc.
-** TODO Make client server-version agnostic
-   The client needs a list of available commands from the server in order to
-   parse the command line. To decouple the client and server completely, the
-   client should ask the server for the available commands and use this info to
-   parse the command line.
+** TODO Use locale settings?
+   Should all input be UTF-8, or should we use locales? What happens to file
+   system encoding of filenames -- assume that to be the same as the locale?
+** [0/2] Improve `input()`
+*** TODO Mirroring mode (optimization for large files)
+    Data read by `input()` is returned as function return value. This could be
+    a problem for really large files, as all data must be handled at the same
+    time, and cannot be processed piecemeal.
 
-   There's gonna be a variable number of arguments for different server
-   commands. Some will only ever take one arg ('load', 'save' etc.) some zero
-   or one ('cd'), some two ('mv', 'cp' -- moar?).
+    The input function should have a mirror mode in which input is processed
+    and output line by line, so that not all of the data need to be in the
+    client's memory running `cat`.
+*** TODO Buffering (for splitting input)
+    Currently, if multiple lines are delivered fast enough to be read by the
+    same `sysread()`, then these are not split apart into separate responses (as
+    they should be). -- This will probably work just fine in most instances.
 
-   Maybe the server greeting could contain the relevant help info? For example
-   something like (sadly, this would make the greeting longer that one line):
+    But, in the future (especially if there are push events coming from the
+    server) read input might have to be split if there are multiple responses
+    read in one `sysread()`.
 
-       OK rong 0.0.42 /tmp/rong-100/default 0(exit halt help list cd) 1(cd
-           cat kill load save) 2(mv cp)
- 
+    Also, remember to clear any server-side buffer when a client is
+    disconnected.
 * [0/2] TESTS
 ** TODO Use the modulino pattern to make program testable
 ** TODO Resolving absolute paths

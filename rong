@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.57';                         # https://semver.org/
-our $VERSION_DATE='4 February 2024';
+our $VERSION='0.0.58';                         # https://semver.org/
+our $VERSION_DATE='5 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -84,12 +84,16 @@ sub create_tempdir {
     sub decode { eval { Encode::decode('UTF-8', shift // $_, $opt) } }
 }
 
-# Returns a decoded and chomped string, or `undef` on error or end-of-file. If
-# there was an error then `$@` is also set to an error message. If both return
-# value and `$@` are `undef` then an end-of-input was reached. (On success `$@`
-# is set to `undef`.)
+# Returns a decoded, chomped and cleaned up (with any multi-line markers
+# removed) string, or `undef` on error or end-of-file. If there was an error
+# then `$@` is set to an error message. On end-of-input if both return value
+# and `$@` are set to `undef`. (On success `$@` is set to `undef`.)
 #
-# Input is read from $fh, in either either single, or multi-line format.
+# Input is read from $fh, in either either single, or multi-line format. A
+# multi-line input is indicated by the first line starting with a period, and
+# ends in a line containing only a single period. (Furthermore, in multi-line
+# content, all lines in which the data itself begin with a period, an extra
+# period is expected to escape the in-data period).
 #
 # Second arg is the file handle of the server connection, if any. If `$fh` and
 # `$server` refer to the same file then any error message will refer to
@@ -102,12 +106,20 @@ sub input {
         my $size = sysread($fh, local $_, 1024 * 1024)
             // die("Cannot read from $src: $!\n");
         return () if $size == 0;
+        if (m#^[.]#) {
+            until (s#^[.]\n\z##m) {             # until final ".\n" is stripped
+                sysread($fh, my $raw, 1024 * 1024)
+                    // die("Cannot read from $src: $!\n");
+                $_ .= $raw;
+            }
+            s#^[.]##gm;                         # strip line-leading '.'
+        }
         chomp($_);
         decode($_) // die("Cannot decode string from $src: $@");
     };
 }
 # Used for writing to socket.
-sub output { syswrite select(), encode join('', @_) }
+sub output { syswrite select(), encode join('', @_) . "\n" }
 
 sub make_socket {
     my %opt = @_;
@@ -231,7 +243,10 @@ sub start_server {
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
-        main::output @{$buf{$file}};
+        main::output
+              ".OK\n",
+              (map { /^[.]/ ? ".$_" : $_ } @{$buf{$file}}),
+              "\n.";
     }
 
     sub cmd_cd {
@@ -242,13 +257,13 @@ sub start_server {
             die "File is not a directory\n" unless -d $newdir;
             $opt{$id}{pwd} = $newdir;
         }
-        main::output "$opt{$id}{pwd}\n";
+        main::output "OK $opt{$id}{pwd}\n";
     }
 
     sub cmd_help {
         my ($id, @arg) = @_;
         die "Too many arguments.\n" if @arg;
-        main::output join(' ', sort(subcommands())) . "\n";
+        main::output "OK @{[ join(' ', sort(subcommands())) ]}\n";
     }
 
     sub cmd_kill {
@@ -257,14 +272,18 @@ sub start_server {
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
         delete $buf{$file};
+        main::output 'OK';
     }
 
     sub cmd_list {
         my ($id, @arg) = @_;
         die "Too many arguments.\n" if @arg;
-        main::output map {
-            escape(relpath($_, $opt{$id}{pwd})) . "\n";
-        } sort keys(%buf);
+        main::output
+              ".OK\n",
+              (map {
+                  escape(relpath($_, $opt{$id}{pwd})) . "\n"
+              } sort keys %buf),
+              "\n.";
     }
 
     sub cmd_load {
@@ -273,6 +292,7 @@ sub start_server {
         $file = abspath($file, $opt{$id}{pwd});
         die "File already loaded\n" if exists $buf{$file};
         $buf{$file} = load_file($file);
+        main::output 'OK';
     }
 
     sub cmd_save {
@@ -281,6 +301,7 @@ sub start_server {
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
         save_file($file, $buf{$file});
+        main::output 'OK';
     }
 
     # Note: escape() & serialize() are used externally (and must therefore not
@@ -319,7 +340,7 @@ sub start_server {
         $opt{$id} = { pwd => rootdir() };
         warn "(client $id connected, path '$opt{$id}{pwd}')\n";
         main::output "OK $PROGRAM v$VERSION " .
-              "-- Use ^D to exit, or 'help' for info.\n";
+              "-- Use ^D to exit, or 'help' for info.";
     }
 
     sub terminate {
@@ -339,9 +360,10 @@ sub start_server {
             die "Unrecognized command\n" unless $rong::{"cmd_$cmd"};
             $rong::{"cmd_$cmd"}($id, @arg);
         };
-        main::output $@
-            ? "ERR Command '@{[ (split /\s+/, $line, 2)[0] ]}': $@"
-            : "OK\n";
+        if ($@) {
+            chomp($@);
+            main::output "ERR Command '@{[ (split /\s+/, $line, 2)[0] ]}': $@";
+        }
         return not $@;
     }
 }
@@ -393,8 +415,8 @@ sub send_command(\$$$) {
     if ($sockets->can_read) {                  # read server response
         $$reply = eval {
             local $_ = input($fh) // die($@ // "Server exited\n");
-            my ($status, $msg) = s#^(ERR|OK)\b\s*(.*)\z##m ? ($1, $2) : ('');
-            die "$msg\n" if $status eq 'ERR';
+            my $status = s#\A(ERR|OK)(?:[ \n]|$)##m ? $1 : '';
+            die "$_\n" if $status eq 'ERR';
             die "Unrecognized server response: '$_'\n" if $status ne 'OK';
             $_;
         };
