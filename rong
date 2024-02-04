@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.56';                         # https://semver.org/
-our $VERSION_DATE='2 February 2024';
+our $VERSION='0.0.57';                         # https://semver.org/
+our $VERSION_DATE='4 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -84,9 +84,12 @@ sub create_tempdir {
     sub decode { eval { Encode::decode('UTF-8', shift // $_, $opt) } }
 }
 
-# Return input string or, or error or end-of-file, undef. Also set `$@` to
-# error message (in case of error), or `undef`. If both return value and `$@`
-# is `undef`, then an end-of-input was reached.
+# Returns a decoded and chomped string, or `undef` on error or end-of-file. If
+# there was an error then `$@` is also set to an error message. If both return
+# value and `$@` are `undef` then an end-of-input was reached. (On success `$@`
+# is set to `undef`.)
+#
+# Input is read from $fh, in either either single, or multi-line format.
 #
 # Second arg is the file handle of the server connection, if any. If `$fh` and
 # `$server` refer to the same file then any error message will refer to
@@ -96,10 +99,11 @@ sub input {
     my ($fh, $server) = @_;
     my $src = $fh ne ($server // '') ? 'client' : 'server';
     return eval {
-        my $size = sysread($fh, my $raw, 1024 * 1024);
-        die("Cannot read from $src: $!\n") if not defined $size;
+        my $size = sysread($fh, local $_, 1024 * 1024)
+            // die("Cannot read from $src: $!\n");
         return () if $size == 0;
-        decode($raw) or die("Cannot decode string from $src: $@");
+        chomp($_);
+        decode($_) // die("Cannot decode string from $src: $@");
     };
 }
 # Used for writing to socket.
@@ -369,7 +373,7 @@ sub server_main {
                 close $fh;
                 next;
             };
-            chomp $line;                       # client sent a command
+            # Client sent a command.
             select $fh;
             rong::invoke($id, $line);
         }
@@ -388,13 +392,11 @@ sub send_command(\$$$) {
     }
     if ($sockets->can_read) {                  # read server response
         $$reply = eval {
-            my $reply = input($fh) // die($@ // "Server exited\n");
-            chomp $reply;
-            $reply =~ s/^(ERR|OK)\b\s*(.*)\z//m;
-            my ($status, $msg) = ($1 // '', $2);
+            local $_ = input($fh) // die($@ // "Server exited\n");
+            my ($status, $msg) = s#^(ERR|OK)\b\s*(.*)\z##m ? ($1, $2) : ('');
             die "$msg\n" if $status eq 'ERR';
-            die "Unknown server response: $reply\n" unless $status eq 'OK';
-            $reply;
+            die "Unrecognized server response: '$_'\n" if $status ne 'OK';
+            $_;
         };
     }
     return not $@;
@@ -434,7 +436,6 @@ my $greeting;
 if ($sockets->can_read) {
     $greeting = input($server)
         // die "Cannot read server greeting: " . ($@ // "Server exited\n");
-    chomp $greeting;
     die "Unrecognized server greeting\n",
         "    expected: 'OK rong v{VERSION} -- {MESSAGE}'\n",
         "    but got : '$greeting'\n"
@@ -490,7 +491,6 @@ while (my @ready = $sockets->can_read) {
             die "Server exited\n" if $fh eq $server;
             exit;                              # ^D from STDIN = exit
         };
-        chomp $input;
         if ($fh eq $server) {                  # from server: write to STDOUT
             say $input;
         } else {                               # from STDIN: send to server
