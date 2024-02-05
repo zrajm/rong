@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.58';                         # https://semver.org/
+our $VERSION='0.0.59';                         # https://semver.org/
 our $VERSION_DATE='5 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -79,9 +79,9 @@ sub create_tempdir {
 }
 
 {
-    state $opt = Encode::FB_CROAK | Encode::LEAVE_SRC;
-    sub encode { eval { Encode::encode('UTF-8', shift // $_, $opt) } }
-    sub decode { eval { Encode::decode('UTF-8', shift // $_, $opt) } }
+    state sub OPT() { Encode::FB_CROAK | Encode::LEAVE_SRC }
+    sub encode { eval { Encode::encode('UTF-8', shift // $_, OPT) } }
+    sub decode { eval { Encode::decode('UTF-8', shift // $_, OPT) } }
 }
 
 # Returns a decoded, chomped and cleaned up (with any multi-line markers
