@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.59';                         # https://semver.org/
-our $VERSION_DATE='5 February 2024';
+our $VERSION='0.0.60';                         # https://semver.org/
+our $VERSION_DATE='6 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -220,7 +220,7 @@ sub start_server {
     # since if both args are in utf8, then the result is, too.
     sub abspath {
         my ($path, $base) = @_;
-        $path =~ s#^~[^/]*# glob("'$&'") #e;
+        $path =~ s#^~[^][}{?* /]*# (glob "'$&'")[0] #e; # expand `~[user]`
         $path = File::Spec->join($base, $path)
             unless File::Spec->file_name_is_absolute($path);
         $path = realpath($path) or die "Cannot find absolute path: $!\n";
