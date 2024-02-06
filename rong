@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.0.60';                         # https://semver.org/
+our $VERSION='0.0.61';                         # https://semver.org/
 our $VERSION_DATE='6 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -339,7 +339,7 @@ sub start_server {
         my ($id, $listenfile) = (@_);
         $opt{$id} = { pwd => rootdir() };
         warn "(client $id connected, path '$opt{$id}{pwd}')\n";
-        main::output "OK $PROGRAM v$VERSION " .
+        main::output "OK Rong v$VERSION " .    # server greeting
               "-- Use ^D to exit, or 'help' for info.";
     }
 
@@ -461,7 +461,7 @@ if ($sockets->can_read) {
     die "Unrecognized server greeting\n",
         "    expected: 'OK rong v{VERSION} -- {MESSAGE}'\n",
         "    but got : '$greeting'\n"
-        unless $greeting =~ /^OK rong v\d+\.\d+\.\d+\b/;
+        unless $greeting =~ /^OK Rong v\d+\.\d+\.\d+\b/;
 }
 
 send_command(my $result, $server, rong::serialize(

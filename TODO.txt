@@ -345,7 +345,7 @@
     CLOSED: [2024-01-28 Sun 18:27]
 *** DONE Tempdir
     CLOSED: [2024-01-28 Sun 18:27]
-* DONE Fix `THIS CANNOT HAPPEN` warning when server receives SIGTERM
+* DONE Fix: `THIS CANNOT HAPPEN` warning when server receives SIGTERM
   CLOSED: [2024-01-29 Mon 18:46]
 * DONE Accept standard server signals (SIGHUP, SIGINT etc)
   CLOSED: [2024-01-29 Mon 18:47]
@@ -353,6 +353,24 @@
   SIGPIPE is received when client disconnects, and needs to be ignored. SIGHUP
   might be received upon backgrounding the server. SIGTERM and SIGINT both
   exits the server.
+* DONE Fix: Expanding user directories should always work
+  CLOSED: [2024-02-06 Tue 12:15]
+  Problem here was `glob()` being called in scalar context, meaning that the
+  result would be different on each call. So, now called in list content, and
+  the extracting only first result.
+
+  Another problem with the way I used `glob()` to expand `~[user]` directory
+  names, is that it allowed other characters that `glob()` treat in a special
+  way, so tightened the character class used to find `~[user]` parts of a path.
+* DONE Fix: Server greeting should contain protocol name, not binary name
+  CLOSED: [2024-02-06 Tue 12:51]
+  The greeting word 'rong' is the name of the protocol, not name of the
+  program. This is relevant when the binary has been symlinked or rename, as
+  the greeting should still contain the protocol name, not whatever name the
+  program file has.
+
+  Also renamed protocol 'Rong' (with capital R) to lessen risk of future
+  confusion.
 * TODO Make sure 2nd arg of `input()` is used where needed
 * [0/1] `rong select`
   Should be able to select files, and section of files. Any subsequent
