@@ -449,7 +449,7 @@
    the old data).
 ** TODO `rong rename`
 ** TODO `rong copy`
-* [2/6] Multi-line responses over the socket
+* [3/5] Multi-line responses over the socket
 ** DONE Create and document multi-line protocol responses
    CLOSED: [2024-02-02 Fri 13:48]
    Added "Protocol" section to the README.
@@ -473,16 +473,11 @@
    stripping leading periods off of lines which consist of more than just a
    single period. (RFC2821, chapter "4.5.2 Transparency"
    https://www.ietf.org/rfc/rfc2821.txt)
-** TODO Make `output()` more helpful
-   `output()` should add 'OK' (or 'ERR') prefix, as well automatically handle
-   single, or multi-line output. Should maybe also be able to output in a loop?
-
-        main::output $_ foreach @{$buf{$file}};
- 
-** TODO `rong cat` -- Output files without final newline
-   Doing `rong cat` respect any lack of a newline at the end of the file. That
-   is, if a file is loaded, then outputted by means of `rong cat`, the
-   outputted text should be identical to the original file.
+** DONE `rong cat` -- Output files without final newline
+   CLOSED: [2024-02-06 Tue 21:55]
+   Doing `rong cat` should respect any lack of a newline at the end of the
+   file. That is, if a file is loaded, then outputted by means of `rong cat`,
+   the outputted text should be identical to the original file.
 ** TODO Formalize escapes in protocol
    Server and client should speak in the same way. Does the client->server
    escaping/unescaping still make sense? Should client messages use multi-line
