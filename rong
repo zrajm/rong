@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.0';                          # https://semver.org/
+our $VERSION='0.1.1';                          # https://semver.org/
 our $VERSION_DATE='6 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -502,7 +502,7 @@ if ($sockets->can_read) {
     $greeting = input($server)
         // die "Cannot read server greeting: " . ($@ // "Server exited\n");
     die "Unrecognized server greeting\n",
-        "    expected: 'OK rong v{VERSION} -- {MESSAGE}'\n",
+        "    expected: 'OK Rong v{VERSION} -- {MESSAGE}'\n",
         "    but got : '$greeting'\n"
         unless $greeting =~ /^OK Rong v\d+\.\d+\.\d+\b/;
 }
