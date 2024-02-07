@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.1';                          # https://semver.org/
-our $VERSION_DATE='6 February 2024';
+our $VERSION='0.1.2';                          # https://semver.org/
+our $VERSION_DATE='7 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -388,7 +388,7 @@ sub start_server {
         warn "(client $id sent, path '$opt{$id}{pwd}'): $line\n"; # received input
         eval {
             my ($cmd, @arg) = deserialize($line);
-            die "Unrecognized command\n" unless $rong::{"cmd_$cmd"};
+            die "Unrecognized command.\n" unless $rong::{"cmd_$cmd"};
             $rong::{"cmd_$cmd"}($id, @arg);
         };
         if ($@) {

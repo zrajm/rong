@@ -111,7 +111,7 @@
   CLOSED: [2024-01-05 Fri 04:18]
   The client should be able to connect, some specified command(s) then
   disconnect, rather than always going into an interactive REPL-mode.
-* [6/6] Basic subcommands
+* [7/7] Basic subcommands
   Server commands only take zero or one arg. Client execute multi-arg commands
   as one command for each arg (resulting in one 'OK' or 'ERR' for each arg).
 ** DONE `rong load FILE...`
@@ -449,7 +449,7 @@
    the old data).
 ** TODO `rong rename`
 ** TODO `rong copy`
-* [3/5] Multi-line responses over the socket
+* [3/4] Multi-line responses over the socket
 ** DONE Create and document multi-line protocol responses
    CLOSED: [2024-02-02 Fri 13:48]
    Added "Protocol" section to the README.
@@ -482,17 +482,7 @@
    Server and client should speak in the same way. Does the client->server
    escaping/unescaping still make sense? Should client messages use multi-line
    messages that look the same as those coming from server?
-** TODO `rong help` -- Detailed help info
-   The detailed help info should provide the same info about the commands as is
-   available from the command line using the `--help` option. (In fact, the
-   `--help` option should fetch *its* help info from the server process, so as
-   to make the client server-version agnostic.)
-
-   The help output is this mode should preferably be the same as with command
-   line help, e.g. `rong help load` should show the same text as `help load` in
-   REPL-mode, and `rong help` and `rong --help` should show the same as `help`
-   in REPL mode.
-* [0/5] Make sure the sockets are used correctly
+* [0/4] Make sure the sockets are used correctly
   Read up on sockets: https://docstore.mik.ua/orelly/perl4/cook/ch17_04.htm
 ** TODO Overview
    Many of the syscalls used for sockets have very cursory descriptions in
@@ -554,7 +544,7 @@
            die "Unsupported mode: $mode\n";
        }
  
-* [0/8] Protocol
+* [0/7] Protocol
 ** TODO Format: Raw mode? (for visual editor clients)
    Telnet protocol apparently have a line-based and a raw mode. How does that
    work?
@@ -569,7 +559,7 @@
 ** TODO Separate protocol logic from server specifics
    The client and server skeleton logic should be in a separate module, and the
    specifics should be separated out into its own module.
-* [0/4] Change-based Load/save
+* [0/3] Change-based Load/save
 ** TODO Implement file fingerprinting
    When loading a file ctime and a file fingerprint should also be remembered,
    then used for intelligently deciding when to save, or reload a file.
@@ -589,7 +579,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [6/10] Improve error messages & help
+* [7/13] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -660,6 +650,20 @@
    Rather than doing complicated tricks here, just give the entire command line
    to the server (minus any leading options intended for the Rong client), and
    let the server deal with it, returning any appropriate errors.
+** DONE `Unrecognized command` should include help info on command line
+   CLOSED: [2024-02-07 Wed 16:16]
+** TODO `Unrecognized command` should include help info in REPL(?)
+   Add "('help' for info.)" to the end of the error message in REPL mode.
+** TODO `rong help` -- Detailed help info
+   The detailed help info should provide the same info about the commands as is
+   available from the command line using the `--help` option. (In fact, the
+   `--help` option should fetch *its* help info from the server process, so as
+   to make the client server-version agnostic.)
+
+   The help output is this mode should preferably be the same as with command
+   line help, e.g. `rong help load` should show the same text as `help load` in
+   REPL-mode, and `rong help` and `rong --help` should show the same as `help`
+   in REPL mode.
 ** TODO Fetch help info from server
    The command information should be read from the server, so that the REPL
    will show the same help info as the command line client.
@@ -707,7 +711,7 @@
 * TODO Command to check if server is running (without starting it)
 * TODO Escaping should use same schema as shell or 'ls' command
   To make it make when using `rong list`.
-* [0/12] FAR-FLUNG FUTURE FEATURES
+* [0/10] FAR-FLUNG FUTURE FEATURES
 ** TODO Suppress build-in warnings from `syswrite()`
    `syswrite()` write warnings to STDERR if there's an error (e.g. writing on a
    closed filehandle). This should instead be handled our own error messages,
