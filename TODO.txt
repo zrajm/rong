@@ -579,7 +579,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [7/13] Improve error messages & help
+* [8/21] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -652,8 +652,12 @@
    let the server deal with it, returning any appropriate errors.
 ** DONE `Unrecognized command` should include help info on command line
    CLOSED: [2024-02-07 Wed 16:16]
-** TODO `Unrecognized command` should include help info in REPL(?)
-   Add "('help' for info.)" to the end of the error message in REPL mode.
+** DONE `rong help COMMAND` info
+   CLOSED: [2024-02-09 Fri 11:18]
+** TODO Pass %opt into `cmd_*` functions
+   Currently `rong::cmd_*` functions return docstring if called with args.
+   Instead of passing the connection id as the first arg, should pass `%opt`
+   with an 'id' property set, and 'help' set to make it pass the docstring.
 ** TODO `rong help` -- Detailed help info
    The detailed help info should provide the same info about the commands as is
    available from the command line using the `--help` option. (In fact, the
@@ -664,12 +668,40 @@
    line help, e.g. `rong help load` should show the same text as `help load` in
    REPL-mode, and `rong help` and `rong --help` should show the same as `help`
    in REPL mode.
+** TODO Make REPL also have implicit commands
+   Just pressing enter in REPL mode should invoke `list`, specifying filenames
+   (without a command) should equal `load` (just as with the command line).
+
+   The reason for doing this is just to simplify the code, as the exact same
+   help info becomes applicable to both REPL mode and the command line
+   (eliminating the need for rewriting it in one of the contexts).
+
+   It also pushes the command logic to the server side (which is fine, if
+   neutral in its effects).
+
+   The con of the whole thing would be that this isn't really how one expect a
+   protocol to behave, but whatevs.
+** TODO Fix: `help()` function should invoke `send_command()`
+   Currently `send_command()` is invoked before `help()` and the result of
+   `send_command()` is passed on to `help()` -- this is only done because
+   invoking `send_command()` from inside `help()` doesn't work, for unknown
+   reason. Fix this.
+** TODO `rong help` from command line should be the same as `rong --help`
+   Currently `rong help` outputs the info one would expect in the REPL, rather
+   than what one would expect on the command line.
+** TODO `rong --help COMMAND`
+   Should give help info on the specified COMMAND.
+** TODO `Unrecognized command` should include help info in REPL(?)
+   Add "('help' for info.)" to the end of the error message in REPL mode.
+** TODO Accept multiple filenames in REPL mode for file commands
+   `cat`, `kill`, `load`, `save`
 ** TODO Fetch help info from server
    The command information should be read from the server, so that the REPL
    will show the same help info as the command line client.
 ** TODO Option `--help` and command `help` should give same output
    When this is done the "Try 'rong --help' for more information." should say
    `rong help` and `rong help COMMAND` rather than the current `rong --help`.
+** TODO Option `--version` should report both server and client versions
 ** TODO Failure when loading a symlink
    When attempting to load a symlinked file that points to a file that is
    already loaded, the error message isn't very helpful. Look at the following:

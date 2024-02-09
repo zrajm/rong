@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.2';                          # https://semver.org/
-our $VERSION_DATE='7 February 2024';
+our $VERSION='0.1.3';                          # https://semver.org/
+our $VERSION_DATE='9 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -35,14 +35,7 @@ Options:
   -V, --version   Output version information and exit
 
 Commands:
-  cat FILE...     Output FILE(s) on standard output
-  cd DIR          Change directory used for relative filenames
-  help            Display list of commands
-  kill FILE...    Unload FILE(s)
-  [list]          List loaded files (default if no FILE given)
-  [load] FILE...  Load FILE(s) (default if FILE(s) are given)
-  repl            Interactively talk to Rong server directly
-  save FILE...    Save FILE(s)
+  %%COMMANDS%%
 
 If neither COMMAND nor FILE(s) are given, `list` is assumed. If FILE(s) are
 specified but COMMAND is not, then `load` is assumed.
@@ -52,7 +45,19 @@ our $PROGRAM = (File::Spec->splitpath(decode(__FILE__)))[2];
 ###############################################################################
 # Functions
 
-sub help { print $USAGE; exit 0; }
+# FIXME: display help, even if we cannot talk to server
+# (but show that some info is missing)
+sub help {
+    my ($cmd_help) = @_;
+    chomp($cmd_help);
+    $USAGE =~ s{(\h*)(\Q%%COMMANDS%%\E)}{      # insert command descriptions
+        my $spc = $1;
+        $cmd_help =~ s#^#$spc#gm;              # indent
+        $cmd_help;
+    }e;
+    print $USAGE;
+    exit 0;
+}
 sub version {
     my ($years)    = $CREATED_DATE =~ m#(\d{4})#;
     my ($end_year) = $VERSION_DATE =~ m#(\d{4})#;
@@ -227,6 +232,14 @@ sub start_server {
     sub realpath { main::decode Cwd::realpath(@_) }
 
     ###########################################################################
+
+    sub max {
+        my $max = shift;
+        $max = $_ > $max ? $_ : $max for @_;
+        return $max;
+    }
+
+    ###########################################################################
     ## Internal functions, called inside eval, use die() to indicate error
 
     sub load_file {
@@ -276,7 +289,11 @@ sub start_server {
     my %opt; # $opt{$id}{$property} where '$id' is a client connection id.
 
     sub cmd_cat {
-        my ($id, $file) = @_;
+        my ($id, $file) = @_ or return <<~DOC;
+            cat FILE...
+
+            Output FILE(s) on standard output.
+            DOC
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
@@ -284,7 +301,11 @@ sub start_server {
     }
 
     sub cmd_cd {
-        my ($id, $dir) = @_;
+        my ($id, $dir) = @_ or return <<~DOC;
+            cd DIR
+
+            Change directory used for relative filenames.
+            DOC
         if (defined $dir) {
             my $newdir = abspath($dir, $opt{$id}{pwd});
             die "Directory does not exist\n" unless -e $newdir;
@@ -295,13 +316,38 @@ sub start_server {
     }
 
     sub cmd_help {
-        my ($id, @arg) = @_;
-        die "Too many arguments.\n" if @arg;
-        main::output('OK', join(' ', sort(subcommands())));
+        my ($id, $cmd) = @_ or return <<~DOC;
+            help [COMMAND|-]
+
+            List commands, or show help for COMMAND.
+            DOC
+        die "Too many arguments.\n" if @_ > 2;
+        my $text;
+        if ($cmd eq '-') {
+            $text = join ' ', sort map { /^cmd_(.*)/ ? $1 : () } keys %rong::;
+        } elsif ($cmd) {
+            die "Unrecognized command.\n" unless $rong::{"cmd_$cmd"};
+            $text = join "\n", $rong::{"cmd_$cmd"}();
+            chomp($text);
+        } else {
+            my @list = map {
+                $rong::{$_}() =~ m#(.*)\n+([^.\n]*)#
+                    ? [$1, $2] : [/^cmd_(\w+)/, '!!! -- UNDOCUMENTED'];
+            } sort grep /^cmd_/, keys(%rong::);
+            my $maxlen = max(map { length($_->[0]) } @list);
+            $text = join("\n", map {
+                sprintf "%-${maxlen}s  %s", @$_;
+            } @list);
+        }
+        main::output('.OK', $text);
     }
 
     sub cmd_kill {
-        my ($id, $file) = @_;
+        my ($id, $file) = @_ or return <<~DOC;
+            kill FILE...
+
+            Unload FILE(s).
+            DOC
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
@@ -310,7 +356,11 @@ sub start_server {
     }
 
     sub cmd_list {
-        my ($id, @arg) = @_;
+        my ($id, @arg) = @_ or return <<~DOC;
+            [list]
+
+            List loaded files (default if no FILE given).
+            DOC
         die "Too many arguments.\n" if @arg;
         main::output('.OK', map {
             escape(relpath($_, $opt{$id}{pwd}));
@@ -318,7 +368,11 @@ sub start_server {
     }
 
     sub cmd_load {
-        my ($id, $file) = @_;
+        my ($id, $file) = @_ or return <<~DOC;
+            [load] FILE...
+
+            Load FILE(s) (default if FILE(s) are given).
+            DOC
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "File already loaded\n" if exists $buf{$file};
@@ -327,7 +381,11 @@ sub start_server {
     }
 
     sub cmd_save {
-        my ($id, $file) = @_;
+        my ($id, $file) = @_ or return <<~DOC;
+            save FILE...
+
+            Save FILE(s).
+            DOC
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
         die "No such file loaded\n" if not exists $buf{$file};
@@ -379,8 +437,6 @@ sub start_server {
         warn "(client $id disconnected, path '$opt{$id}{pwd}')\n";
         delete $opt{$id};
     }
-
-    sub subcommands { map { /^cmd_(.*)/ ? $1 : () } keys(%rong::) }
 
     # Result should always end in one line starting with 'OK' or 'ERR'.
     sub invoke {
@@ -444,7 +500,6 @@ sub server_main {
 # error with the socket during communication.
 sub send_command(\$$$;%) {
     my ($reply, $fh, $cmdstr, %opt) = @_;
-    #$opt{raw} //= '';
     my $sockets = IO::Select->new($fh);
     if ($sockets->can_write) {                 # send command to server
         syswrite $fh, encode "$cmdstr\n";
@@ -480,12 +535,13 @@ local $SIG{__DIE__} = sub {
 my $tempdir = create_tempdir();
 my $socket  = File::Spec->join($tempdir, "default");
 my $logfile = File::Spec->join($tempdir, "default.log");
+my %opt = (help => 0, version => 0);
 
 my @arg;
 while (@ARGV) {
     local $_ = decode shift(@ARGV);
     /^--$/ and do { push(@arg, @ARGV); last };
-    /^(-h|--help)$/ and help();
+    /^(-h|--help)$/ and do { $opt{help} = 1; next };
     /^(-V|--version)$/ and version();
     /^-./ and die "Unrecognized option '$_'.\n";
     push(@arg, $_);
@@ -507,13 +563,19 @@ if ($sockets->can_read) {
         unless $greeting =~ /^OK Rong v\d+\.\d+\.\d+\b/;
 }
 
+if ($opt{help}) {
+    send_command(my $result, $server, rong::serialize('help'))
+        or warn "Cannot get help info from Rong server: $@";
+    help($result);
+}
+
 send_command(my $result, $server, rong::serialize(
     'cd', rong::workdir() // rong::rootdir(),
 )) or warn "Cannot change dir: $@";
 
 # Get subcommand from command line.
 my $cmd = do {
-    send_command(my $cmds, $server, rong::serialize('help'))
+    send_command(my $cmds, $server, rong::serialize(qw/help -/))
         or die "Cannot read available commands from Rong server\n";
     my %cmds = map { $_ => 1 } (rong::deserialize($cmds), 'repl');
     local $_ = $arg[0];
