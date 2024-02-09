@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.3';                          # https://semver.org/
+our $VERSION='0.1.4';                          # https://semver.org/
 our $VERSION_DATE='9 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -31,7 +31,7 @@ Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
 A daemonic headless text editor.
 
 Options:
-  -h, --help      Display this help and exit
+  -h, --help      Display this help, or COMMAND help, and exit
   -V, --version   Output version information and exit
 
 Commands:
@@ -45,17 +45,23 @@ our $PROGRAM = (File::Spec->splitpath(decode(__FILE__)))[2];
 ###############################################################################
 # Functions
 
+sub send_command(\$$$;%);                      # declare prototype early
+
 # FIXME: display help, even if we cannot talk to server
 # (but show that some info is missing)
 sub help {
-    my ($cmd_help) = @_;
-    chomp($cmd_help);
-    $USAGE =~ s{(\h*)(\Q%%COMMANDS%%\E)}{      # insert command descriptions
-        my $spc = $1;
-        $cmd_help =~ s#^#$spc#gm;              # indent
-        $cmd_help;
-    }e;
-    print $USAGE;
+    my ($server, @cmd) = @_;
+    send_command(my $text, $server, rong::serialize('help', @cmd))
+        or die $@;
+    print @cmd ? $text : do {
+        $USAGE =~ s{(\h*)(\Q%%COMMANDS%%\E)}{  # insert list of commands
+            my $spc = $1;
+            chomp($text);
+            $text =~ s#^#$spc#gm;              # indent
+            $text;
+        }e;
+        $USAGE;
+    };
     exit 0;
 }
 sub version {
@@ -284,7 +290,8 @@ sub start_server {
     }
 
     # Here say() & print() goes to client; warn() goes to log; die() exits with
-    # error message.
+    # error message. All cmd_*() functions return a documenting string if
+    # called without args.
     my %buf;
     my %opt; # $opt{$id}{$property} where '$id' is a client connection id.
 
@@ -326,7 +333,8 @@ sub start_server {
         if ($cmd eq '-') {
             $text = join ' ', sort map { /^cmd_(.*)/ ? $1 : () } keys %rong::;
         } elsif ($cmd) {
-            die "Unrecognized command.\n" unless $rong::{"cmd_$cmd"};
+            die "No help found for command '$cmd'\n"
+                unless $rong::{"cmd_$cmd"};
             $text = join "\n", $rong::{"cmd_$cmd"}();
             chomp($text);
         } else {
@@ -529,7 +537,7 @@ local $SIG{__DIE__} = sub {
     die @_ if $^S;                             # abort if called inside eval
     my $more = (my $msg = "@_") =~ s/[.]$//;   # ending in '.' = extra help
     die("$PROGRAM: $msg",
-        $more && "Try '$PROGRAM --help' for more information.\n");
+        $more && "Try '$PROGRAM help' for more information.\n");
 };
 
 my $tempdir = create_tempdir();
@@ -545,6 +553,11 @@ while (@ARGV) {
     /^(-V|--version)$/ and version();
     /^-./ and die "Unrecognized option '$_'.\n";
     push(@arg, $_);
+}
+
+if (!$opt{help} and ($arg[0] // '') eq 'help') {
+    shift(@arg);
+    $opt{help} = 1;
 }
 
 # Connect to server.
@@ -563,11 +576,8 @@ if ($sockets->can_read) {
         unless $greeting =~ /^OK Rong v\d+\.\d+\.\d+\b/;
 }
 
-if ($opt{help}) {
-    send_command(my $result, $server, rong::serialize('help'))
-        or warn "Cannot get help info from Rong server: $@";
-    help($result);
-}
+help($server, @arg ? $arg[0] : ())
+    if $opt{help};
 
 send_command(my $result, $server, rong::serialize(
     'cd', rong::workdir() // rong::rootdir(),
@@ -602,7 +612,7 @@ if ($cmd ne 'repl') {
             warn "$PROGRAM: $msg\n";
         }
     }
-    warn "Try '$PROGRAM --help' for more information.\n" if $more;
+    warn "Try '$PROGRAM help' for more information.\n" if $more;
     exit($err ? 127 : 0);
 }
 
