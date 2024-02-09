@@ -579,7 +579,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [15/21] Improve error messages & help
+* [16/20] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -700,6 +700,24 @@
 ** DONE `rong --help COMMAND`
    CLOSED: [2024-02-09 Fri 14:12]
    Should give help info on the specified COMMAND.
+** DONE `Unrecognized command` should include help info in REPL(?)
+   CLOSED: [2023-06-03 Sat 16:07]
+   Add "('help' for info.)" to the end of the error message in REPL mode.
+** DONE Error messages from `repl` and other subcommands should look the same
+   CLOSED: [2023-06-03 Sat 16:07]
+   Currently there's a difference in error messages between client-only
+   commands (only `repl` at this point in time), and server commands. These
+   should look the same:
+
+       $ rong repl ga
+       rong: No args allowed
+       Try 'rong --help' for more information.
+
+   (The above is missing the full `rong repl` command in the error message.)
+
+       $ rong list ga
+       rong list ga: No args allowed
+ 
 ** TODO Make REPL also have implicit commands
    Just pressing enter in REPL mode should invoke `list`, specifying filenames
    (without a command) should equal `load` (just as with the command line).
@@ -713,8 +731,6 @@
 
    The con of the whole thing would be that this isn't really how one expect a
    protocol to behave, but whatevs.
-** TODO `Unrecognized command` should include help info in REPL(?)
-   Add "('help' for info.)" to the end of the error message in REPL mode.
 ** TODO Accept multiple filenames in REPL mode for file commands
    `cat`, `kill`, `load`, `save`
 ** TODO Option `--version` should report both server and client versions
@@ -730,20 +746,6 @@
        rong load le: File already loaded
 
    The error message should include that Rong attempted to load.
-** TODO Error messages from `repl` and other subcommands should look the same
-   Currently there's a difference in error messages between client-only
-   commands (only `repl` at this point in time), and server commands. These
-   should look the same:
-
-       $ rong repl ga
-       rong: No args allowed
-       Try 'rong --help' for more information.
-
-   (The above is missing the full `rong repl` command in the error message.)
-
-       $ rong list ga
-       rong list ga: No args allowed
- 
 * TODO `rong list` option to display absolute paths
 * TODO All clients should die (immediately) if server dies
   Maybe temporarily add a die command to test this on the server side?

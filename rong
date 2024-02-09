@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.4';                          # https://semver.org/
-our $VERSION_DATE='9 February 2024';
+our $VERSION='0.1.3';                          # https://semver.org/
+our $VERSION_DATE='14 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -631,12 +631,11 @@ while (my @ready = $sockets->can_read) {
         if ($fh eq $server) {                  # from server: write to STDOUT
             say $input;
         } else {                               # from STDIN: send to server
-            if (send_command(my $result, $server, $input, raw => 1)) {
-                say $result;
-            } else {
-                $@ =~ s/[.]?\n$//;              # chomp + strip trailing '.'
-                say $@;
-            }
+            send_command(local $_, $server, $input, raw => 1);
+            chomp($_ = $@ || $_);
+            # Trailing in error message period = extra help.
+            s/^(ERR[ \n].*)[.]\z/$1 (try 'help' for info)/m;
+            say $_;
         }
     }
 }
