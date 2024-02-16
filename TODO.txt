@@ -375,6 +375,8 @@
   CLOSED: [2024-02-16 Fri 10:44]
   This code is always run, while it looks like a conditional. That's kinda
   misleading.
+* DONE Added `exit` command
+  CLOSED: [2024-02-16 Fri 14:07]
 * TODO Make sure 2nd arg of `input()` is used where needed
 * [0/1] `rong select`
   Should be able to select files, and section of files. Any subsequent

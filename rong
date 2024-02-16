@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.4';                          # https://semver.org/
+our $VERSION='0.1.5';                          # https://semver.org/
 our $VERSION_DATE='16 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -322,6 +322,16 @@ sub start_server {
         main::output('OK', $opt{$id}{pwd});
     }
 
+    sub cmd_exit {
+        my ($id, @arg) = @_ or return <<~DOC;
+            exit
+
+            Disconnect client from server.
+            DOC
+        die "Too many arguments.\n" if @arg;
+        close(select());
+    }
+
     sub cmd_help {
         my ($id, $cmd) = @_ or return <<~DOC;
             help [COMMAND|-]
@@ -515,7 +525,7 @@ sub send_command(\$$$;%) {
     $$reply = eval {                           # read server response
         $sockets->can_read or die "Server connection timed out\n";
         local $_ = input($fh, raw => $opt{raw})
-            // die($@ // "Server exited\n");
+            // die($@ || "Server exited\n");
         return $_ if $opt{raw};
         my ($multiline, $status) =
             s#\A([.]{0,2})(ERR|OK)(?:[ \n]|$)##m ? ($1, $2) : ('', '');
@@ -568,7 +578,7 @@ my $sockets = IO::Select->new($server);
 $sockets->can_read
     or die "Cannot read server greeting: Connection timed out\n";
 my $greeting = input($server)
-    // die "Cannot read server greeting: " . ($@ // "Server exited\n");
+    // die "Cannot read server greeting: " . ($@ || "Server exited\n");
 die "Unrecognized server greeting\n",
     "    expected: 'OK Rong v{VERSION} -- {MESSAGE}'\n",
     "    but got : '$greeting'\n"
