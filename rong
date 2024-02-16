@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.3';                          # https://semver.org/
-our $VERSION_DATE='14 February 2024';
+our $VERSION='0.1.4';                          # https://semver.org/
+our $VERSION_DATE='16 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -512,21 +512,20 @@ sub send_command(\$$$;%) {
     if ($sockets->can_write) {                 # send command to server
         syswrite $fh, encode "$cmdstr\n";
     }
-    if ($sockets->can_read) {                  # read server response
-        $$reply = eval {
-            local $_ = input($fh, raw => $opt{raw})
-                // die($@ // "Server exited\n");
-            return $_ if $opt{raw};
-            my ($multiline, $status) =
-                s#\A([.]{0,2})(ERR|OK)(?:[ \n]|$)##m ? ($1, $2) : ('', '');
-            die "$_\n" if $status eq 'ERR';
-            die "Unrecognized server response: '$_'\n" if $status ne 'OK';
+    $$reply = eval {                           # read server response
+        $sockets->can_read or die "Server connection timed out\n";
+        local $_ = input($fh, raw => $opt{raw})
+            // die($@ // "Server exited\n");
+        return $_ if $opt{raw};
+        my ($multiline, $status) =
+            s#\A([.]{0,2})(ERR|OK)(?:[ \n]|$)##m ? ($1, $2) : ('', '');
+        die "$_\n" if $status eq 'ERR';
+        die "Unrecognized server response: '$_'\n" if $status ne 'OK';
 
-            # Preserve missing final linefeed for '..' and empty outputs.
-            return $_ if $multiline eq '..' or $_ eq '';
-            return "$_\n";
-        };
-    }
+        # Preserve missing final linefeed for '..' and empty outputs.
+        return $_ if $multiline eq '..' or $_ eq '';
+        return "$_\n";
+    };
     return not $@;
 }
 
@@ -566,15 +565,14 @@ my $server = start_server($socket, $logfile)
 my $sockets = IO::Select->new($server);
 
 # Verify server greeting.
-my $greeting;
-if ($sockets->can_read) {
-    $greeting = input($server)
-        // die "Cannot read server greeting: " . ($@ // "Server exited\n");
-    die "Unrecognized server greeting\n",
-        "    expected: 'OK Rong v{VERSION} -- {MESSAGE}'\n",
-        "    but got : '$greeting'\n"
-        unless $greeting =~ /^OK Rong v\d+\.\d+\.\d+\b/;
-}
+$sockets->can_read
+    or die "Cannot read server greeting: Connection timed out\n";
+my $greeting = input($server)
+    // die "Cannot read server greeting: " . ($@ // "Server exited\n");
+die "Unrecognized server greeting\n",
+    "    expected: 'OK Rong v{VERSION} -- {MESSAGE}'\n",
+    "    but got : '$greeting'\n"
+    unless $greeting =~ /^OK Rong v\d+\.\d+\.\d+\b/;
 
 help($server, @arg ? $arg[0] : ())
     if $opt{help};
