@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.5';                          # https://semver.org/
+our $VERSION='0.1.6';                          # https://semver.org/
 our $VERSION_DATE='16 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -35,6 +35,7 @@ Options:
   -V, --version   Output version information and exit
 
 Commands:
+  repl            Interactively talk to Rong server directly
   %%COMMANDS%%
 
 If neither COMMAND nor FILE(s) are given, `list` is assumed. If FILE(s) are
@@ -54,12 +55,25 @@ sub help {
     send_command(my $text, $server, rong::serialize('help', @cmd))
         or die $@;
     print @cmd ? $text : do {
-        $USAGE =~ s{(\h*)(\Q%%COMMANDS%%\E)}{  # insert list of commands
-            my $spc = $1;
-            chomp($text);
-            $text =~ s#^#$spc#gm;              # indent
-            $text;
-        }e;
+        chomp($text);
+        for ($USAGE) {
+            s/\Q%%COMMANDS%%\E/$text/;   # insert list of commands
+
+            # Find left column width.
+            my $maxlen = rong::max(map { length } /^\h*(.*?)\h{2,}/gm);
+
+            # Sort and (re-)indent option & command lines.
+            s{^(\h*.*?\h{2,}.*?\n)+}{
+                join('', sort {
+                    # Sort by first word with two or more characters.
+                    ($a =~ /(\w{2,})/)[0] cmp ($b =~ /(\w{2,})/)[0];
+                } map {
+                    # Indent and space-pad left column.
+                    s/^\h+//;
+                    sprintf("  %-${maxlen}s  %s", split(/\h{2,}/, $_, 2));
+                } split(/^/m, $&));
+            }gmex;
+        }
         $USAGE;
     };
     exit 0;
@@ -299,7 +313,9 @@ sub start_server {
         my ($id, $file) = @_ or return <<~DOC;
             cat FILE...
 
-            Output FILE(s) on standard output.
+            Output loaded FILE(s) on standard output. The outputted result is
+            identical to the originally loaded FILE. FILE(s) may be given as
+            either absolute or relative paths (see command `cd`).
             DOC
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
@@ -311,7 +327,12 @@ sub start_server {
         my ($id, $dir) = @_ or return <<~DOC;
             cd DIR
 
-            Change directory used for relative filenames.
+            Set directory used for relative filenames. This doesn't actually
+            change the current directory of the Rong server (which is always
+            set to the root directory when started) but any relative file names
+            are taken to be relative to this directory. This affects the output
+            of the `list` command, and allowed input for all file commands
+            (such as `load`, `save`, `kill` etc).
             DOC
         if (defined $dir) {
             my $newdir = abspath($dir, $opt{$id}{pwd});
@@ -326,7 +347,14 @@ sub start_server {
         my ($id, @arg) = @_ or return <<~DOC;
             exit
 
-            Disconnect client from server.
+            Disconnect REPL client from server (also ^D). Use this (or ^D) to
+            exit a REPL session. Results in a a 'server disconnected' error if
+            used on the command line. -- This command makes the server
+            disconnect, the server process itself remains running. To terminate
+            the server (losing any unsaved changes) use a shell command like:
+
+                pkill -f 'rong --daemon'
+
             DOC
         die "Too many arguments.\n" if @arg;
         close(select());
@@ -336,7 +364,16 @@ sub start_server {
         my ($id, $cmd) = @_ or return <<~DOC;
             help [COMMAND|-]
 
-            List commands, or show help for COMMAND.
+            Show command overview, or help about COMMAND. If given on the
+            command line, this command is identical to the `--help` option
+            (except that the option may be placed anywhere on the command line,
+            while the `help` command must be first on the command line). In
+            REPL mode the help information only covers the available commands
+            (and not any command line options, or additional information).
+
+            When `-` is given as an argument, a single-line list of the names
+            the supported commands is shown. (This list is used internally when
+            parsing the command line.)
             DOC
         die "Too many arguments.\n" if @_ > 2;
         my $text;
@@ -364,7 +401,9 @@ sub start_server {
         my ($id, $file) = @_ or return <<~DOC;
             kill FILE...
 
-            Unload FILE(s).
+            Unload FILE(s). The file is removed from memory, and any unsaved
+            changes are lost. FILE(s) may be given as either absolute or
+            relative paths (see command `cd`).
             DOC
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
@@ -377,7 +416,9 @@ sub start_server {
         my ($id, @arg) = @_ or return <<~DOC;
             [list]
 
-            List loaded files (default if no FILE given).
+            List loaded files (default if no FILE given). Paths are displayed
+            relative to the current directory (set with the `cd` command), or,
+            if the current directory is root, then absolute paths are listed.
             DOC
         die "Too many arguments.\n" if @arg;
         main::output('.OK', map {
@@ -389,7 +430,9 @@ sub start_server {
         my ($id, $file) = @_ or return <<~DOC;
             [load] FILE...
 
-            Load FILE(s) (default if FILE(s) are given).
+            Load FILE(s) (default if only FILE(s) are given). To reload an
+            already loaded file, `kill` it first. FILE(s) may be given as
+            either absolute or relative paths (see command `cd`).
             DOC
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});
@@ -402,7 +445,9 @@ sub start_server {
         my ($id, $file) = @_ or return <<~DOC;
             save FILE...
 
-            Save FILE(s).
+            Save FILE(s). Writes over the previously existing version of
+            FILE(s) on the disk. FILE(s) may be given as either absolute or
+            relative paths (see command `cd`).
             DOC
         die "No file specified.\n" unless $file;
         $file = abspath($file, $opt{$id}{pwd});

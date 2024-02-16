@@ -585,7 +585,7 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [16/20] Improve error messages & help
+* [18/22] Improve error messages & help
 ** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
    CLOSED: [2024-01-18 Thu 22:17]
    Giving incorrect args to a command inserts 'rong:' twice in the error
@@ -724,6 +724,10 @@
        $ rong list ga
        rong list ga: No args allowed
  
+** DONE Include `repl` command in help
+   CLOSED: [2024-02-16 Fri 19:26]
+** DONE Document each command more thoroughly
+   CLOSED: [2024-02-16 Fri 19:26]
 ** TODO Make REPL also have implicit commands
    Just pressing enter in REPL mode should invoke `list`, specifying filenames
    (without a command) should equal `load` (just as with the command line).
