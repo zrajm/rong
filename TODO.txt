@@ -377,6 +377,10 @@
   misleading.
 * DONE Added `exit` command
   CLOSED: [2024-02-16 Fri 14:07]
+* DONE Fix: `cmd_help()` shouldn't log `uninitialized value $cmd`
+  CLOSED: [2024-02-17 Sat 02:01]
+  `cmd_help()` when invoked with zero args logs an `Use of uninitialized value
+  $cmd in string eq`. Fix this.
 * TODO Make sure 2nd arg of `input()` is used where needed
 * [0/1] `rong select`
   Should be able to select files, and section of files. Any subsequent

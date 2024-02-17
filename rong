@@ -23,8 +23,8 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.6';                          # https://semver.org/
-our $VERSION_DATE='16 February 2024';
+our $VERSION='0.1.7';                          # https://semver.org/
+our $VERSION_DATE='17 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
 Usage: rong [OPTION]... [COMMAND [ARG]...|FILE...]
@@ -377,14 +377,7 @@ sub start_server {
             DOC
         die "Too many arguments.\n" if @_ > 2;
         my $text;
-        if ($cmd eq '-') {
-            $text = join ' ', sort map { /^cmd_(.*)/ ? $1 : () } keys %rong::;
-        } elsif ($cmd) {
-            die "No help found for command '$cmd'\n"
-                unless $rong::{"cmd_$cmd"};
-            $text = join "\n", $rong::{"cmd_$cmd"}();
-            chomp($text);
-        } else {
+        if (not defined $cmd) {
             my @list = map {
                 $rong::{$_}() =~ m#(.*)\n+([^.\n]*)#
                     ? [$1, $2] : [/^cmd_(\w+)/, '!!! -- UNDOCUMENTED'];
@@ -393,6 +386,13 @@ sub start_server {
             $text = join("\n", map {
                 sprintf "%-${maxlen}s  %s", @$_;
             } @list);
+        } elsif ($cmd eq '-') {
+            $text = join ' ', sort map { /^cmd_(.*)/ ? $1 : () } keys %rong::;
+        } elsif ($cmd) {
+            die "No help found for command '$cmd'\n"
+                unless $rong::{"cmd_$cmd"};
+            $text = join "\n", $rong::{"cmd_$cmd"}();
+            chomp($text);
         }
         main::output('.OK', $text);
     }
