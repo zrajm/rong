@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.8';                          # https://semver.org/
+our $VERSION='0.1.9';                          # https://semver.org/
 our $VERSION_DATE='17 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -135,15 +135,20 @@ sub create_tempdir {
 #
 sub input {
     my ($fh, %opt) = @_;
-    return eval {
-        my $size = sysread($fh, local $_, 1024 * 1024) // die "$!\n";
+    state sub sockread {
+        my ($fh, %opt) = @_;
+        my $size = sysread($fh, my $raw, 1024 * 1024) // die "$!\n";
         if ($size == 0) {
             die "Disconnected early\n" if $opt{fail_on_eof};
             return ();
         }
+        return $raw;
+    }
+    return eval {
+        local $_ = sockread($fh, %opt) // return ();
         if (m#^[.]#) {
             until (/^[.]\n\z/m) {              # until final ".\n" is found
-                sysread($fh, my $raw, 1024 * 1024) // die "$!\n";
+                my $raw = sockread($fh, %opt) // return ();
                 $_ .= $raw;
             }
             if (!$opt{raw}) {
@@ -164,8 +169,7 @@ sub output {
     my $fh = select();
     state sub sockwrite {
         my ($fh, $str) = @_;
-        syswrite($fh, encode($str))
-            // die "Cannot write to socket: $!\n";
+        syswrite($fh, encode($str)) // die "Cannot write to socket: $!\n";
     }
     if ($status !~ /^[.]/) {
         sockwrite($fh, join(' ', $status, @_) . "\n");
