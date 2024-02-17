@@ -383,6 +383,180 @@
   $cmd in string eq`. Fix this.
 * DONE Refactored `input()` and `send_command()` and verified their calls
   CLOSED: [2024-02-17 Sat 02:22]
+* [18/22] Improve error messages & help
+** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
+   CLOSED: [2024-01-18 Thu 22:17]
+   Giving incorrect args to a command inserts 'rong:' twice in the error
+   output. Fix this:
+
+       $ rong list BLA
+       rong list BLA: rong: No args allowed
+
+   Was the result of a `$SIG{__DIE__}` hook being invoked inside an `eval { }`
+   block.
+** DONE Better sigdie handling
+   CLOSED: [2024-01-19 Fri 19:46]
+   Instead of having to `local $SIG{__DIE__} = 'DEFAULT'` inside of each eval
+   block, the sigdie handler should detect that it was called from inside an
+   eval, and not do it's usual error message rewriting.
+
+   It was surprisingly hard to find a good description of how to avoid this,
+   but I finally found it, hidden away in the perlfunc manpage (under the
+   description of `die` function). Rather than giving a full code example, the
+   manpage simply states that one should add the line `die @_ if $^S;` as the
+   first line of any `$SIG{__DIE__}` handler.
+
+   While searching for a way to do this I found the special Perl variable
+   `$^S`, but had a hard time finding any more info since special characters
+   aren't very googlable. I did find the following pages helpful though:
+
+     + [[https://www.perlmonks.org/?node_id=51097][Perl's Warn and Die Signals (on Perlmonks)]]
+     + [[https://www.perlmonks.org/?node_id=42411][SIGDIE (on Perlmonks)]]
+     + perlfunc manpage (at end of description for `die`)
+     + perlvar manpage (both under `%SIG` and `$^S`)
+ 
+** DONE Sigdie handling should be setup at beginning of main
+   CLOSED: [2024-01-19 Fri 20:14]
+** DONE Make error messages more user friendly
+   CLOSED: [2024-01-20 Sat 08:15]
+   When invoking command from the command line, like so
+
+       $ rong list osuh
+       rong list osuh: No args allowed
+
+   The error message should more similar to when an incorrect option was given:
+
+       $ rong --osuhou
+       rong: Unrecognized option '--osuhou'
+       Try 'rong help' for more information.
+
+   Something more like this:
+
+       $ rong list osuh
+       rong list "osuh": No args allowed
+       Try 'rong help list' for more information.
+ 
+** DONE More pedagogical server greeting
+   CLOSED: [2024-01-30 Tue 11:31]
+   When user connect in REPL mode, the server greeting should indicate that ^D
+   is used to quit, and that `help` can be used for additional info.
+** DONE Make client server-version agnostic
+   CLOSED: [2024-02-02 Fri 14:11]
+   The client needs a list of available commands from the server in order to
+   parse the command line. To decouple the client and server completely, the
+   client should ask the server for the available commands and use this info to
+   parse the command line.
+
+   There's gonna be a variable number of arguments for different server
+   commands. Some will only ever take one arg ('load', 'save' etc.) some zero
+   or one ('cd'), some two ('mv', 'cp' -- moar?).
+
+   Rather than doing complicated tricks here, just give the entire command line
+   to the server (minus any leading options intended for the Rong client), and
+   let the server deal with it, returning any appropriate errors.
+** DONE `Unrecognized command` should include help info on command line
+   CLOSED: [2024-02-07 Wed 16:16]
+** DONE `rong help COMMAND` info
+   CLOSED: [2024-02-09 Fri 11:18]
+** DONE Fetch help info from server
+   CLOSED: [2024-02-09 Fri 11:18]
+   The command information should be read from the server, so that the REPL
+   will show the same help info as the command line client.
+** WONT Pass %opt into `cmd_*` functions -- NO
+   CLOSED: [2024-02-09 Fri 12:57]
+   Currently `rong::cmd_*` functions return docstring if called with args.
+   Instead of passing the connection id as the first arg, should pass `%opt`
+   with an 'id' property set, and 'help' set to make it pass the docstring.
+
+   WHY NOT? No, the above is silly. Functions are invoked by the server which
+   have no info beyond what was passed via the protocol (i.e. any `--help`
+   option given to the client is not an option to be passed to the server). The
+   above idea was just me confusing the levels of indirection.
+** DONE `rong help` -- Detailed help info
+   CLOSED: [2024-02-09 Fri 14:12]
+   The detailed help info should provide the same info about the commands as is
+   available from the command line using the `--help` option. (In fact, the
+   `--help` option should fetch *its* help info from the server process, so as
+   to make the client server-version agnostic.)
+
+   The help output is this mode should preferably be the same as with command
+   line help, e.g. `rong help load` should show the same text as `help load` in
+   REPL-mode, and `rong help` and `rong --help` should show the same as `help`
+   in REPL mode.
+** DONE Fix: `help()` function should invoke `send_command()`
+   CLOSED: [2024-02-09 Fri 14:12]
+   Currently `send_command()` is invoked before `help()` and the result of
+   `send_command()` is passed on to `help()` -- this is only done because
+   invoking `send_command()` from inside `help()` doesn't work, for unknown
+   reason. Fix this.
+
+   This didn't work because of a prototype error. `send_command()` uses a
+   prototype, which means that it needs to be declared be before any function
+   that calls it. (Which wasn't the case with `help()`.) Fixed by adding an
+   early prototype declaration.
+** DONE Option `--help` and command `help` should give same output
+   CLOSED: [2024-02-09 Fri 14:12]
+   When this is done the "Try 'rong --help' for more information." should say
+   `rong help` and `rong help COMMAND` rather than the current `rong --help`.
+
+   Currently `rong help` outputs the info one would expect in the REPL, rather
+   than what one would expect on the command line.
+** DONE `rong --help COMMAND`
+   CLOSED: [2024-02-09 Fri 14:12]
+   Should give help info on the specified COMMAND.
+** DONE `Unrecognized command` should include help info in REPL(?)
+   CLOSED: [2023-06-03 Sat 16:07]
+   Add "('help' for info.)" to the end of the error message in REPL mode.
+** DONE Error messages from `repl` and other subcommands should look the same
+   CLOSED: [2023-06-03 Sat 16:07]
+   Currently there's a difference in error messages between client-only
+   commands (only `repl` at this point in time), and server commands. These
+   should look the same:
+
+       $ rong repl ga
+       rong: No args allowed
+       Try 'rong --help' for more information.
+
+   (The above is missing the full `rong repl` command in the error message.)
+
+       $ rong list ga
+       rong list ga: No args allowed
+ 
+** DONE Include `repl` command in help
+   CLOSED: [2024-02-16 Fri 19:26]
+** DONE Document each command more thoroughly
+   CLOSED: [2024-02-16 Fri 19:26]
+** TODO Make REPL also have implicit commands
+   Just pressing enter in REPL mode should invoke `list`, specifying filenames
+   (without a command) should equal `load` (just as with the command line).
+
+   The reason for doing this is just to simplify the code, as the exact same
+   help info becomes applicable to both REPL mode and the command line
+   (eliminating the need for rewriting it in one of the contexts).
+
+   It also pushes the command logic to the server side (which is fine, if
+   neutral in its effects).
+
+   The con of the whole thing would be that this isn't really how one expect a
+   protocol to behave, but whatevs.
+** TODO Accept multiple filenames in REPL mode for file commands
+   `cat`, `kill`, `load`, `save`
+** TODO Option `--version` should report both server and client versions
+** TODO Failure when loading a symlink
+   When attempting to load a symlinked file that points to a file that is
+   already loaded, the error message isn't very helpful. Look at the following:
+
+       $ rong
+       README.txt
+       $ ls -h le
+       lrwxrwxrwx 1 zrajm zrajm 9 2024-01-17 18:46 le -> README.md
+       $ rong le
+       rong load le: File already loaded
+
+   The error message should include that Rong attempted to load.
+* TODO Rename `repl` command `shell`
+  Also update all mentions of REPL in the docs to instead say 'shell' or 'Rong
+  shell'.
 * [0/1] `rong select`
   Should be able to select files, and section of files. Any subsequent
   operations would then be performed on the selection only.
@@ -570,7 +744,7 @@
 ** TODO Separate protocol logic from server specifics
    The client and server skeleton logic should be in a separate module, and the
    specifics should be separated out into its own module.
-* [0/3] Change-based Load/save
+* [0/3] Change-based `load` and `save` commands
 ** TODO Implement file fingerprinting
    When loading a file ctime and a file fingerprint should also be remembered,
    then used for intelligently deciding when to save, or reload a file.
@@ -590,177 +764,6 @@
    This should use fingerprinting, but do a checksum if fingerprint fails. That
    is, if file is identical to existing one, it should *never* be saved again.
    (Instead a message should be given to the user.)
-* [18/22] Improve error messages & help
-** DONE Fix faulty error messages (`__DIE__` hook double rewrite)
-   CLOSED: [2024-01-18 Thu 22:17]
-   Giving incorrect args to a command inserts 'rong:' twice in the error
-   output. Fix this:
-
-       $ rong list BLA
-       rong list BLA: rong: No args allowed
-
-   Was the result of a `$SIG{__DIE__}` hook being invoked inside an `eval { }`
-   block.
-** DONE Better sigdie handling
-   CLOSED: [2024-01-19 Fri 19:46]
-   Instead of having to `local $SIG{__DIE__} = 'DEFAULT'` inside of each eval
-   block, the sigdie handler should detect that it was called from inside an
-   eval, and not do it's usual error message rewriting.
-
-   It was surprisingly hard to find a good description of how to avoid this,
-   but I finally found it, hidden away in the perlfunc manpage (under the
-   description of `die` function). Rather than giving a full code example, the
-   manpage simply states that one should add the line `die @_ if $^S;` as the
-   first line of any `$SIG{__DIE__}` handler.
-
-   While searching for a way to do this I found the special Perl variable
-   `$^S`, but had a hard time finding any more info since special characters
-   aren't very googlable. I did find the following pages helpful though:
-
-     + [[https://www.perlmonks.org/?node_id=51097][Perl's Warn and Die Signals (on Perlmonks)]]
-     + [[https://www.perlmonks.org/?node_id=42411][SIGDIE (on Perlmonks)]]
-     + perlfunc manpage (at end of description for `die`)
-     + perlvar manpage (both under `%SIG` and `$^S`)
- 
-** DONE Sigdie handling should be setup at beginning of main
-   CLOSED: [2024-01-19 Fri 20:14]
-** DONE Make error messages more user friendly
-   CLOSED: [2024-01-20 Sat 08:15]
-   When invoking command from the command line, like so
-
-       $ rong list osuh
-       rong list osuh: No args allowed
-
-   The error message should more similar to when an incorrect option was given:
-
-       $ rong --osuhou
-       rong: Unrecognized option '--osuhou'
-       Try 'rong help' for more information.
-
-   Something more like this:
-
-       $ rong list osuh
-       rong list "osuh": No args allowed
-       Try 'rong help list' for more information.
- 
-** DONE More pedagogical server greeting
-   CLOSED: [2024-01-30 Tue 11:31]
-   When user connect in REPL mode, the server greeting should indicate that ^D
-   is used to quit, and that `help` can be used for additional info.
-** DONE Make client server-version agnostic
-   CLOSED: [2024-02-02 Fri 14:11]
-   The client needs a list of available commands from the server in order to
-   parse the command line. To decouple the client and server completely, the
-   client should ask the server for the available commands and use this info to
-   parse the command line.
-
-   There's gonna be a variable number of arguments for different server
-   commands. Some will only ever take one arg ('load', 'save' etc.) some zero
-   or one ('cd'), some two ('mv', 'cp' -- moar?).
-
-   Rather than doing complicated tricks here, just give the entire command line
-   to the server (minus any leading options intended for the Rong client), and
-   let the server deal with it, returning any appropriate errors.
-** DONE `Unrecognized command` should include help info on command line
-   CLOSED: [2024-02-07 Wed 16:16]
-** DONE `rong help COMMAND` info
-   CLOSED: [2024-02-09 Fri 11:18]
-** DONE Fetch help info from server
-   CLOSED: [2024-02-09 Fri 11:18]
-   The command information should be read from the server, so that the REPL
-   will show the same help info as the command line client.
-** WONT Pass %opt into `cmd_*` functions -- NO
-   CLOSED: [2024-02-09 Fri 12:57]
-   Currently `rong::cmd_*` functions return docstring if called with args.
-   Instead of passing the connection id as the first arg, should pass `%opt`
-   with an 'id' property set, and 'help' set to make it pass the docstring.
-
-   WHY NOT? No, the above is silly. Functions are invoked by the server which
-   have no info beyond what was passed via the protocol (i.e. any `--help`
-   option given to the client is not an option to be passed to the server). The
-   above idea was just me confusing the levels of indirection.
-** DONE `rong help` -- Detailed help info
-   CLOSED: [2024-02-09 Fri 14:12]
-   The detailed help info should provide the same info about the commands as is
-   available from the command line using the `--help` option. (In fact, the
-   `--help` option should fetch *its* help info from the server process, so as
-   to make the client server-version agnostic.)
-
-   The help output is this mode should preferably be the same as with command
-   line help, e.g. `rong help load` should show the same text as `help load` in
-   REPL-mode, and `rong help` and `rong --help` should show the same as `help`
-   in REPL mode.
-** DONE Fix: `help()` function should invoke `send_command()`
-   CLOSED: [2024-02-09 Fri 14:12]
-   Currently `send_command()` is invoked before `help()` and the result of
-   `send_command()` is passed on to `help()` -- this is only done because
-   invoking `send_command()` from inside `help()` doesn't work, for unknown
-   reason. Fix this.
-
-   This didn't work because of a prototype error. `send_command()` uses a
-   prototype, which means that it needs to be declared be before any function
-   that calls it. (Which wasn't the case with `help()`.) Fixed by adding an
-   early prototype declaration.
-** DONE Option `--help` and command `help` should give same output
-   CLOSED: [2024-02-09 Fri 14:12]
-   When this is done the "Try 'rong --help' for more information." should say
-   `rong help` and `rong help COMMAND` rather than the current `rong --help`.
-
-   Currently `rong help` outputs the info one would expect in the REPL, rather
-   than what one would expect on the command line.
-** DONE `rong --help COMMAND`
-   CLOSED: [2024-02-09 Fri 14:12]
-   Should give help info on the specified COMMAND.
-** DONE `Unrecognized command` should include help info in REPL(?)
-   CLOSED: [2023-06-03 Sat 16:07]
-   Add "('help' for info.)" to the end of the error message in REPL mode.
-** DONE Error messages from `repl` and other subcommands should look the same
-   CLOSED: [2023-06-03 Sat 16:07]
-   Currently there's a difference in error messages between client-only
-   commands (only `repl` at this point in time), and server commands. These
-   should look the same:
-
-       $ rong repl ga
-       rong: No args allowed
-       Try 'rong --help' for more information.
-
-   (The above is missing the full `rong repl` command in the error message.)
-
-       $ rong list ga
-       rong list ga: No args allowed
- 
-** DONE Include `repl` command in help
-   CLOSED: [2024-02-16 Fri 19:26]
-** DONE Document each command more thoroughly
-   CLOSED: [2024-02-16 Fri 19:26]
-** TODO Make REPL also have implicit commands
-   Just pressing enter in REPL mode should invoke `list`, specifying filenames
-   (without a command) should equal `load` (just as with the command line).
-
-   The reason for doing this is just to simplify the code, as the exact same
-   help info becomes applicable to both REPL mode and the command line
-   (eliminating the need for rewriting it in one of the contexts).
-
-   It also pushes the command logic to the server side (which is fine, if
-   neutral in its effects).
-
-   The con of the whole thing would be that this isn't really how one expect a
-   protocol to behave, but whatevs.
-** TODO Accept multiple filenames in REPL mode for file commands
-   `cat`, `kill`, `load`, `save`
-** TODO Option `--version` should report both server and client versions
-** TODO Failure when loading a symlink
-   When attempting to load a symlinked file that points to a file that is
-   already loaded, the error message isn't very helpful. Look at the following:
-
-       $ rong
-       README.txt
-       $ ls -h le
-       lrwxrwxrwx 1 zrajm zrajm 9 2024-01-17 18:46 le -> README.md
-       $ rong le
-       rong load le: File already loaded
-
-   The error message should include that Rong attempted to load.
 * TODO `rong list` option to display absolute paths
 * TODO All clients should die (immediately) if server dies
   Maybe temporarily add a die command to test this on the server side?
