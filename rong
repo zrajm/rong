@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.7';                          # https://semver.org/
+our $VERSION='0.1.8';                          # https://semver.org/
 our $VERSION_DATE='17 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -52,8 +52,9 @@ sub send_command(\$$$;%);                      # declare prototype early
 # (but show that some info is missing)
 sub help {
     my ($server, @cmd) = @_;
-    send_command(my $text, $server, rong::serialize('help', @cmd))
-        or die $@;
+    send_command(my $text, $server, rong::serialize('help', @cmd),
+                 fail_on_eof => 1)
+        or die "Cannot get help info from server: $@";
     print @cmd ? $text : do {
         chomp($text);
         for ($USAGE) {
@@ -110,9 +111,10 @@ sub create_tempdir {
 }
 
 # Returns a decoded, chomped and cleaned up string, or `undef` on error or
-# end-of-file. If there was an error then `$@` is set to an error message. On
-# end-of-input if both return value and `$@` are set to `undef`. (On success
-# `$@` is set to `undef`.)
+# end-of-file (meaning that the server broke the connection). Also sets `$@`,
+# either to the empty string (on success or end-of-file), or to an error
+# message (in the case of an error). In the case of an end-of-file, return
+# value will be `undef`, but `$@` will be set to empty string.)
 #
 # Input is read from $fh, in either either single, or multi-line format. A
 # multi-line input is indicated by the first line starting with one or two
@@ -120,36 +122,28 @@ sub create_tempdir {
 # in multi-line content, all lines in which the data itself begin with a
 # period, an extra period is expected to escape the in-data period).
 #
-# Named options may be provided after the second argument. Currently two
-# arguments are supported.
+# Named options may be provided after the second argument:
 #
-# * `raw => 1`-- Suppress cleanup of multi-line server response, and return the
-#   response gotten from the server as-is. (Normally lines in the response
-#   which have leading period(s) are stripped of one period, and the
-#   `<LF>.<LF>` sequence that terminates the response is removed.) Note that
-#   leading `OK`/`ERR` and the one or two periods which may precede that is
-#   always returned. In 'raw' mode `$@` is only set if there's a connection
-#   error with the socket, any `ERR` responses from the server are treated the
-#   same as `OK` responses.
+# * `fail_on_eof => 1` -- Will cause an early end-of-file to set `$@` with an
+#   appropriate error message. (Without this flag `$@` will be set to empty
+#   string.) Return value is always `undef` on end-of-file, regardless of what
+#   this option is set to.
 #
-# * `server => $fh` -- Used to identify a file handle used for the server
-#   connection (if any). This (only) affects error messages. If the given file
-#   handle is the same as the one input is read from and an error occur the
-#   resulting error message will say that there was an error in reading from
-#   the server. (In all other cases, the error message will say that there was
-#   an error in communicating with a client.)
+# * `raw => 1`-- Normally, response lines which have leading period(s) are
+#   stripped of one period, and the `<LF>.<LF>` sequence that terminates the
+#   response is removed, with this option they are left in intact.
 #
 sub input {
     my ($fh, %opt) = @_;
-    my $src = $fh ne ($opt{server} // '') ? 'client' : 'server';
     return eval {
-        my $size = sysread($fh, local $_, 1024 * 1024)
-            // die("Cannot read from $src: $!\n");
-        return () if $size == 0;
+        my $size = sysread($fh, local $_, 1024 * 1024) // die "$!\n";
+        if ($size == 0) {
+            die "Disconnected early\n" if $opt{fail_on_eof};
+            return ();
+        }
         if (m#^[.]#) {
             until (/^[.]\n\z/m) {              # until final ".\n" is found
-                sysread($fh, my $raw, 1024 * 1024)
-                    // die("Cannot read from $src: $!\n");
+                sysread($fh, my $raw, 1024 * 1024) // die "$!\n";
                 $_ .= $raw;
             }
             if (!$opt{raw}) {
@@ -158,7 +152,7 @@ sub input {
             }
         }
         chomp($_);
-        decode($_) // die("Cannot decode string from $src: $@");
+        decode($_) // die("Cannot decode string: $@");
     };
 }
 # Used for writing to socket.
@@ -540,7 +534,7 @@ sub server_main {
             }
             my $id = fileno($fh);
             my $line = input($fh) // do {      # client disconnected
-                warn "(client $id) ERROR! $@\n" if $@;
+                warn "(client $id) ERROR! Cannot read from client: $@" if $@;
                 rong::terminate($id);
                 $sockets->remove($fh);
                 close $fh;
@@ -556,21 +550,33 @@ sub server_main {
 
 # Send $cmdstring to server $fh, setting $reply to the response gotten from
 # server. Returns true if server returned an 'OK' response, false otherwise (in
-# which case $reply is set to `undef` and $@ is set to an error message).
+# which case $reply is set to `undef` and `$@` is set to an error message).
 #
-# In 'raw' mode both 'OK' and 'ERR' messages are passed through as-is
-# (returning true). And `undef` is only returned (and `$@` set) if there's an
-# error with the socket during communication.
+# Named options may be given after third argument (see also `input()`):
+#
+# * `fail_on_eof => 1` -- Set `$@` to appropriate message on end-of-file error.
+#
+# * `raw => 1`-- Suppress cleanup of multi-line server response, returning the
+#   response gotten from the server as-is (see `input()` `raw` option). This
+#   also keeps the leading `OK`/`ERR` and the optional `.` or `..` that might
+#   precede it. In `raw` mode `$@` is only set if there's a connection error
+#   with the socket, any `ERR` responses from the server are treated the same
+#   as `OK` responses.
+#
 sub send_command(\$$$;%) {
     my ($reply, $fh, $cmdstr, %opt) = @_;
     my $sockets = IO::Select->new($fh);
     if ($sockets->can_write) {                 # send command to server
         syswrite $fh, encode "$cmdstr\n";
     }
+    my $eof;
     $$reply = eval {                           # read server response
         $sockets->can_read or die "Server connection timed out\n";
-        local $_ = input($fh, raw => $opt{raw})
-            // die($@ || "Server exited\n");
+        local $_ = input($fh, %opt) // do {
+            die $@ if $@;
+            $eof = 1;
+            return ();
+        };
         return $_ if $opt{raw};
         my ($multiline, $status) =
             s#\A([.]{0,2})(ERR|OK)(?:[ \n]|$)##m ? ($1, $2) : ('', '');
@@ -581,7 +587,7 @@ sub send_command(\$$$;%) {
         return $_ if $multiline eq '..' or $_ eq '';
         return "$_\n";
     };
-    return not $@;
+    return ($eof || $@) ? () : 1;
 }
 
 ###############################################################################
@@ -622,8 +628,8 @@ my $sockets = IO::Select->new($server);
 # Verify server greeting.
 $sockets->can_read
     or die "Cannot read server greeting: Connection timed out\n";
-my $greeting = input($server)
-    // die "Cannot read server greeting: " . ($@ || "Server exited\n");
+my $greeting = input($server, fail_on_eof => 1)
+    // die("Cannot read server greeting: $@");
 die "Unrecognized server greeting\n",
     "    expected: 'OK Rong v{VERSION} -- {MESSAGE}'\n",
     "    but got : '$greeting'\n"
@@ -634,12 +640,13 @@ help($server, @arg ? $arg[0] : ())
 
 send_command(my $result, $server, rong::serialize(
     'cd', rong::workdir() // rong::rootdir(),
-)) or warn "Cannot change dir: $@";
+), fail_on_eof => 1) or die "Cannot set current directory for server: $@";
 
 # Get subcommand from command line.
 my $cmd = do {
-    send_command(my $cmds, $server, rong::serialize(qw/help -/))
-        or die "Cannot read available commands from Rong server\n";
+    send_command(my $cmds, $server, rong::serialize(qw/help -/),
+                 fail_on_eof => 1)
+        or die "Cannot get list of commands from server: $@";
     my %cmds = map { $_ => 1 } (rong::deserialize($cmds), 'repl');
     local $_ = $arg[0];
     @arg == 0                  ? 'list'      : # no args
@@ -659,6 +666,7 @@ if ($cmd ne 'repl') {
         if (send_command(my $result, $server, $cmdstr)) {
             print $result;
         } else {
+            die "Server disconnected\n" if !$@;# quit on eof (otherwise warn)
             chomp(my $msg = $@);
             $err  = 1;
             $more = 1 if $msg =~ s/[.]$//;     # ending in '.' = extra help
@@ -676,17 +684,20 @@ binmode(STDIN, ':raw');
 $sockets->add(\*STDIN);
 while (my @ready = $sockets->can_read) {
     foreach my $fh (@ready) {
-        my $input = input($fh, server => $server) // do {
-            die $@ if $@;
-            die "Server exited\n" if $fh eq $server;
-            exit;                              # ^D from STDIN = exit
+        # Read input from either STDIN or socket.
+        my $input = input($fh, fail_on_eof => $fh eq $server) // do {
+            exit unless $@;                    # eof on STDIN
+            die "Cannot read from " .
+                ($fh eq $server ? 'server' : 'client') . ": $@";
         };
         if ($fh eq $server) {                  # from server: write to STDOUT
             say $input;
         } else {                               # from STDIN: send to server
-            send_command(local $_, $server, $input, raw => 1);
+            send_command(local $_, $server, $input, raw => 1) or do {
+                die "Server disconnected\n" unless $@;
+            };
             chomp($_ = $@ || $_);
-            # Trailing in error message period = extra help.
+            # Trailing period in error message = extra help.
             s/^(ERR[ \n].*)[.]\z/$1 (try 'help' for info)/m;
             say $_;
         }
