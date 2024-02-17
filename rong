@@ -23,7 +23,7 @@ use File::Spec;
 use Encode ();
 
 our $AUTHOR='zrajm <rong@zrajm.org>';
-our $VERSION='0.1.9';                          # https://semver.org/
+our $VERSION='0.1.10';                         # https://semver.org/
 our $VERSION_DATE='17 February 2024';
 our $CREATED_DATE='28 December 2023'; # never change this!
 our $USAGE = <<'USAGE_END';
@@ -537,16 +537,18 @@ sub server_main {
                 next;
             }
             my $id = fileno($fh);
-            my $line = input($fh) // do {      # client disconnected
+            my $line = input($fh);
+            if (defined $line) {               # client sent command
+                select $fh;
+                rong::invoke($id, $line);
+            } else {                           # client disconnected
                 warn "(client $id) ERROR! Cannot read from client: $@" if $@;
+                close $fh;
+            }
+            if (not defined fileno $fh) {      # cleanup if closed
                 rong::terminate($id);
                 $sockets->remove($fh);
-                close $fh;
-                next;
-            };
-            # Client sent a command.
-            select $fh;
-            rong::invoke($id, $line);
+            }
         }
     }
     die "THIS CANNOT HAPPEN\n";                # above loop never exits
